@@ -4,6 +4,8 @@ user=${1:-mocha};repo=$(cd "$(dirname "$0")/.." && pwd)
 test "$EUID" = 0;id "$user" >/dev/null
 home=$(getent passwd "$user" | cut -d: -f6)
 test -x /usr/local/bin/niri;test -x /usr/local/bin/noctalia
+test -f /usr/local/lib/systemd/user/niri.service
+test -f /usr/local/lib/systemd/user/niri-shutdown.target
 install -d -o "$user" -g "$user" "$home/.config/niri" "$home/.config/noctalia" "$home/Pictures/Wallpapers"
 install -o "$user" -g "$user" -m644 "$repo/config/niri.kdl" "$home/.config/niri/config.kdl"
 install -o "$user" -g "$user" -m644 "$repo/config/noctalia.toml" "$home/.config/noctalia/config.toml"

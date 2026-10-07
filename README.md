@@ -15,37 +15,70 @@ Cargo.lock        # Niri26.04实际锁文件，Smithay固定revision
 
 ## 构建
 
-桌面安装在已启动的Debian13 armhf；Niri/Noctalia可以本机编译，也可在Linux主机交叉编译。
-推荐在主机构建。ARM依赖通过dpkg --add-architecture armhf后安装；Rust target=armv7-unknown-linux-gnueabihf，linker=arm-linux-gnueabihf-gcc。
+桌面安装在已启动的Debian13 armhf。下列命令在Debian13 amd64 Linux主机运行，板上只安装运行产物。
+`install-build-deps.sh`启用armhf multiarch和trixie-backports，安装实际交叉构建使用的依赖；Rust target=armv7-unknown-linux-gnueabihf，linker=arm-linux-gnueabihf-gcc。
 工具脚本要求提供已解开的Niri源码与官方vendored dependencies目录，避免在线漂移：
 
 ```sh
+sudo bash tools/install-build-deps.sh
 curl -L https://github.com/niri-wm/niri/archive/refs/tags/v26.04.tar.gz -o niri.tar.gz
 curl -L https://github.com/niri-wm/niri/releases/download/v26.04/niri-26.04-vendored-dependencies.tar.xz -o vendor.tar.xz
 mkdir -p build/niri
 tar xf niri.tar.gz -C build/niri --strip-components=1
-# 按官方vendor包内目录结构解压，将vendor/与.cargo/config.toml放入build/niri。
-tar tf vendor.tar.xz | head
+# 官方依赖包包含vendor/；Cargo的离线替换配置由本仓库提供。
 tar xf vendor.tar.xz -C build/niri
+mkdir -p build/niri/.cargo
+cp config/cargo-armhf.toml build/niri/.cargo/config.toml
 bash tools/build-niri.sh build/niri
 ```
 
 应用**0003**完整补丁；它包含0002的修改，因此不能把0002和0003串行重复应用。修改vendor后更新.cargo-checksum.json，cargo clean -p smithay，否则Cargo可能复用不可变Git依赖缓存，源码改了实际二进制没变。
-交叉构建依赖包：libudev-dev:armhf、libgbm-dev:armhf、libegl1-mesa-dev:armhf、libgles2-mesa-dev:armhf、libinput-dev:armhf、libxkbcommon-dev:armhf、libseat-dev:armhf、libdisplay-info-dev:armhf、libdbus-1-dev:armhf；以Niri构建错误确认缺失库。
+完整主机依赖列表保存在`tools/install-build-deps.sh`，不要把几十个-dev包和Cargo缓存直接装入平板的小APP分区。
 
-Noctalia完整依赖以其固定版本meson.build为准。交叉文件样例noctalia-armhf-cross.ini仅作工具链参考，prefix用/usr/local；执行meson install安装二进制**和数据目录**。只复制noctalia可导致壁纸缩略图不显示。
+Noctalia 5.2.1是C++23/Meson工程。交叉文件使用ARMv7 NEON硬浮点和`-latomic`；关闭主机原生指令优化、jemalloc和测试。安装二进制**和数据目录**，只复制noctalia可导致壁纸缩略图不显示。
+
+```sh
+curl -L https://github.com/noctalia-dev/noctalia/archive/refs/tags/v5.2.1.tar.gz -o noctalia.tar.gz
+mkdir -p build/noctalia
+tar xf noctalia.tar.gz -C build/noctalia --strip-components=1
+bash tools/build-noctalia.sh build/noctalia build/desktop-package
+stage="$PWD/build/desktop-package"
+install -d "$stage/usr/local/bin" "$stage/usr/local/lib/systemd/user"
+install -m755 build/niri/target/armv7-unknown-linux-gnueabihf/release/niri "$stage/usr/local/bin/niri"
+arm-linux-gnueabihf-strip --strip-unneeded "$stage/usr/local/bin/niri"
+sed 's|^ExecStart=niri |ExecStart=/usr/local/bin/niri |' build/niri/resources/niri.service > "$stage/usr/local/lib/systemd/user/niri.service"
+install -m644 build/niri/resources/niri-shutdown.target "$stage/usr/local/lib/systemd/user/"
+tar -C "$stage" -czf build/desktop-armhf.tar.gz usr/local
+sha256sum build/desktop-armhf.tar.gz
+```
+
+`/usr/local`是公开安装统一路径，和原机私有数据挂载路径不同；规范化路径的整套新安装尚未重新实机验收。
 
 ## 设备安装
 
 在板上先安装运行服务：
 
+先通过root SSH执行`passwd mocha`为本地用户设置自己的密码，之后可使用sudo；SSH仍只接受密钥。以下APT步骤要求根文件系统有足够空间，先用`df -h / /usr /var`和`apt -s install ...`评估。原厂APP约1.25GiB，不能保证放下浏览器与全部依赖；只bind mount `/usr/local`不会迁走APT的`/usr/lib`、`/usr/share`。数据分区上的完整桌面rootfs迁移与APP扩容尚未提供通过实机验收的自动方案，不要在空间不足时强行执行。
+
 ```sh
 sudo apt install firefox-esr foot mesa-utils libgl1-mesa-dri libegl1 \
   dbus-user-session network-manager bluez upower pipewire wireplumber \
-  pipewire-pulse policykit-1 brightnessctl ffmpeg mpv fonts-dejavu-core
-sudo install -m755 YOUR_ARMHF_NIRI /usr/local/bin/niri
-# 将Noctalia meson install的完整/usr/local产物安装，而不只放一个ELF。
+  pipewire-pulse policykit-1 brightnessctl ffmpeg mpv fonts-dejavu-core \
+  libsdbus-c++2 libwayland-client0 libfreetype6 libfontconfig1 libcairo2 \
+  libpango-1.0-0 libpangocairo-1.0-0 libharfbuzz0b librsvg2-2 libxkbcommon0 \
+  libglib2.0-0t64 libsecret-1-0 libsodium23 libpolkit-agent-1-0 \
+  libpolkit-gobject-1-0 libpipewire-0.3-0t64 libwireplumber-0.5-0 \
+  libcurl3t64-gnutls libqalculate23 libxml2 libmd4c0 libtomlplusplus3t64 \
+  libical3t64 libgles2 libepoxy0 libwebp7 libwebpdemux2 libwebpmux3 \
+  libjxl0.11 libsndfile1 libinput10 libseat1 libdisplay-info2 libliftoff0 \
+  libsystemd0 libdbus-1-3 libgbm1 libudev1
+# 将主机生成的desktop-armhf.tar.gz及desktop源码目录传到平板。
+sudo tar -xzf desktop-armhf.tar.gz -C /
+ldd /usr/local/bin/niri
+ldd /usr/local/bin/noctalia
+# 两个ldd输出均不能有not found；缺库时先安装对应armhf运行包。
 sudo bash tools/install-session.sh mocha
+# 首次在本机tty1检查自动会话；SSH会话不能替代active seat验证。
 ```
 
 APP约1.25GiB，不足以放完整编译缓存。选择已备份的UDA数据文件系统、用自己的PARTUUID挂载，再bind mount桌面安装目录；避免破坏原有数据或无记录地格式化UDA。
@@ -62,7 +95,9 @@ native Tegra + Nouveau线性DMA-BUF色块约29.8FPS实机出图；Niri仍在Mesa
 ## 最小充电模式
 
 ```sh
+# 在Linux交叉构建主机运行；把生成的build/mocha-charger-ui连同仓库传到平板。
 bash tools/build-charger.sh
+# 以下在平板上执行，要求build/mocha-charger-ui是ARM产物且ldd没有not found。
 sudo bash tools/install-charger.sh
 # 先手工限时试运行并确认按住电源2秒进入桌面，再启用自动入口：
 sudo touch /boot/mocha-charger.enabled
