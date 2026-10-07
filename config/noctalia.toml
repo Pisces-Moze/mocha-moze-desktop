@@ -1,0 +1,11 @@
+[shell]
+polkit_agent = true
+lang = "zh-Hans"
+font_family = "sans-serif"
+setup_wizard_enabled = false
+
+[theme]
+mode = "dark"
+
+[bar.default]
+position = "top"

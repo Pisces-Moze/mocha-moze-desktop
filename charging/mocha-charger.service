@@ -1,0 +1,18 @@
+[Unit]
+Description=Mocha minimal charging display
+After=systemd-udev-trigger.service local-fs.target systemd-logind.service
+Wants=systemd-logind.service
+After=getty@tty1.service user@1000.service
+Conflicts=getty@tty1.service user@1000.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/loginctl terminate-user mocha
+ExecStartPre=/sbin/modprobe mocha_miui_backlight
+ExecStart=/usr/bin/systemd-inhibit --what=handle-power-key --mode=block --who=MochaCharging --why=Charging-screen-power-key-handling /usr/local/libexec/mocha-charger-session
+EnvironmentFile=-/etc/default/mocha-charger
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=3

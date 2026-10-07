@@ -1,0 +1,59 @@
+input {
+    keyboard { xkb { layout "us"; }; }
+    touchpad { tap; natural-scroll; }
+    touch { map-to-output "Unknown-1"; }
+}
+
+hotkey-overlay { skip-at-startup; }
+
+output "Unknown-1" {
+    scale 1.5
+    transform "90"
+}
+
+layout {
+    gaps 10
+    default-column-width { proportion 0.9; }
+    focus-ring { width 2; active-color "#89b4fa"; }
+}
+
+spawn-at-startup "/usr/local/bin/noctalia"
+
+window-rule {
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
+
+window-rule {
+    match app-id="dev.noctalia.Noctalia"
+    open-floating true
+}
+
+layer-rule {
+    match namespace="^noctalia-"
+    background-effect { blur false; }
+}
+
+debug {
+    honor-xdg-activation-with-invalid-serial
+    render-drm-device "/dev/dri/renderD128"
+}
+
+binds {
+    Mod+Return { spawn "foot"; }
+    Mod+B { spawn "firefox-esr"; }
+    Mod+Space { spawn "/usr/local/bin/noctalia" "msg" "panel-toggle" "launcher"; }
+    Mod+S { spawn "/usr/local/bin/noctalia" "msg" "panel-toggle" "control-center"; }
+    Mod+Comma { spawn "/usr/local/bin/noctalia" "msg" "settings-toggle"; }
+    Mod+Q { close-window; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+Tab { toggle-overview; }
+    Mod+Left { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up { focus-window-up; }
+    Mod+Down { focus-window-down; }
+    Mod+Shift+Left { move-column-left; }
+    Mod+Shift+Right { move-column-right; }
+    Mod+Shift+E { quit; }
+}

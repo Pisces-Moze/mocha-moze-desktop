@@ -1,0 +1,31 @@
+--- a/src/backend/drm/compositor/mod.rs
++++ b/src/backend/drm/compositor/mod.rs
+@@ -2295,7 +2295,7 @@
+                             self.primary_plane_damage_bag.add(render_damage.iter().map(|d| {
+                                 d.to_logical(1).to_buffer(
+                                     1,
+-                                    Transform::Normal,
++                                    output_transform,
+                                     &output_geometry.size.to_logical(1),
+                                 )
+                             }));
+@@ -2303,7 +2303,9 @@
+                                 self.surface.device_fd(),
+                                 config.properties.src,
+                                 config.properties.dst,
+-                                render_damage.iter().copied(),
++                                render_damage.iter().map(|rect| {
++                                    output_transform.transform_rect_in(*rect, &output_geometry.size)
++                                }),
+                             )
+                             .ok()
+                             .flatten();
+@@ -2324,7 +2326,7 @@
+                         self.primary_plane_damage_bag
+                             .add([output_geometry.to_logical(1).to_buffer(
+                                 1,
+-                                Transform::Normal,
++                                output_transform,
+                                 &output_geometry.size.to_logical(1),
+                             )]);
+ 

@@ -1,0 +1,6 @@
+[Unit]
+Description=Mocha offline charging
+Requires=basic.target local-fs.target
+Wants=mocha-charger.service
+After=basic.target local-fs.target
+AllowIsolate=yes

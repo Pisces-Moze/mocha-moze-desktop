@@ -1,0 +1,30 @@
+#!/usr/bin/python3
+"""Select the minimal charger target on wired-power boots; disabled until tested."""
+from pathlib import Path
+import sys
+
+def select_charge(enabled, online, command_line, desktop_once):
+    explicit = any(word.startswith('systemd.unit=') or word == 'mocha_native_debug4=1'
+                   for word in command_line.split())
+    return enabled and online and not desktop_once and not explicit
+
+def main():
+    if len(sys.argv) != 4:
+        return
+    if not Path('/boot/mocha-charger.enabled').exists():
+        return
+    once = Path('/boot/mocha-desktop.once')
+    desktop_once = once.exists()
+    if desktop_once:
+        once.unlink()
+    try:
+        online = Path('/sys/class/power_supply/bq24190-charger/online').read_text().strip() == '1'
+    except OSError:
+        online = False
+    if select_charge(True, online, Path('/proc/cmdline').read_text(), desktop_once):
+        early = Path(sys.argv[2])
+        early.mkdir(parents=True, exist_ok=True)
+        (early / 'default.target').symlink_to('/etc/systemd/system/mocha-charger.target')
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,16 @@
+[Unit]
+Description=Mocha BC1.2 charger input policy
+Wants=mocha-usb.service
+After=mocha-usb.service
+Before=mocha-charger.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/mocha-charge-policy.py
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target mocha-charger.target

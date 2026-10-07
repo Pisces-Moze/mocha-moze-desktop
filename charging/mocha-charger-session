@@ -1,0 +1,9 @@
+#!/bin/sh
+prefix=/usr/local/libexec
+"$prefix/mocha-charger-ui" --live
+result=$?
+case "$result" in
+ 10) systemctl --no-block isolate multi-user.target ;;
+ 20) systemctl --no-block poweroff ;;
+ *) exit "$result" ;;
+esac

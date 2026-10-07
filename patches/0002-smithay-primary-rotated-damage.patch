@@ -1,0 +1,13 @@
+--- a/src/backend/drm/compositor/mod.rs
++++ b/src/backend/drm/compositor/mod.rs
+@@ -2303,7 +2303,9 @@
+                                 self.surface.device_fd(),
+                                 config.properties.src,
+                                 config.properties.dst,
+-                                render_damage.iter().copied(),
++                                render_damage.iter().map(|rect| {
++                                    output_transform.transform_rect_in(*rect, &output_geometry.size)
++                                }),
+                             )
+                             .ok()
+                             .flatten();
