@@ -16,7 +16,7 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 | --- | --- |
 | 横屏桌面（Niri + Noctalia + Firefox ESR） | 可运行，动画约 10 FPS |
 | 横屏旋转 damage | 已用 0003 修复黑条与残影 |
-| native Tegra + Nouveau 输出 | 约 29.8 FPS，Niri 在 Mesa 调用点崩溃，未默认启用 |
+| native Tegra + Nouveau 输出 | 约 29.8 FPS；已有 Mesa 空回调修复候选与回归测试，原生桌面实机验收待完成，未默认启用 |
 | 视频播放 | 软件 H.264 / Firefox 已验证 |
 | 硬件编解码 | 未完成 |
 | 最小充电模式 | 可用，与桌面互斥切换 |
@@ -44,6 +44,8 @@ Niri 与 Smithay 的补丁不改上游许可证。本仓库没有附这两个项
 | `noctalia-armhf-cross.ini` | Noctalia 的 Meson cross file（位于仓库根目录） |
 | `patches/0002-smithay-primary-rotated-damage.patch` | 早期补丁，仅供对照，不再应用 |
 | `patches/0003-smithay-complete-rotated-damage.patch` | 当前使用，包含 0002 的全部改动 |
+| `patches/0004-mesa-tegra-optional-fence-callbacks.patch` | Mesa 25.0.7 的 Tegra 可选 fence 回调修复候选；单独应用到 Mesa，不能应用到 Smithay |
+| `tools/build-mesa.sh`、`tools/probe-egl-fence.py` | 构建独立 Mesa 候选与板上无 modeset 的 fence 回归；验收步骤见 [MESA-FENCE.md](docs/MESA-FENCE.md) |
 | `charging/` | Cairo framebuffer UI、BC1.2 探测与输入限流、按键状态机、systemd 单元与 boot generator |
 | `tools/` | 桌面与充电模式的构建、安装脚本 |
 | `services/README.md` | 系统级与用户级服务的依赖关系说明 |
