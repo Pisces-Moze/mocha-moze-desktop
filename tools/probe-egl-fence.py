@@ -8,6 +8,7 @@ not zero-copy scanout or panel output. SPDX-License-Identifier: GPL-2.0-only
 """
 import argparse
 import ctypes as C
+import hashlib
 import os
 import sys
 from pathlib import Path
@@ -24,12 +25,41 @@ def driver(node):
     return (Path('/sys/class/drm') / Path(node).name / 'device/driver').resolve().name
 
 
+def verify_mesa_libraries(prefix):
+    """Check live mappings so a system/candidate mixture cannot pass unnoticed."""
+    prefix = prefix.resolve(strict=True)
+    required = ('libEGL_mesa.so', 'libgbm.so', 'libgallium')
+    found = set()
+    libraries = set()
+    for line in Path('/proc/self/maps').read_text(encoding='utf-8').splitlines():
+        fields = line.split(maxsplit=5)
+        if len(fields) != 6 or not fields[5].startswith('/'):
+            continue
+        path = Path(fields[5])
+        for name in required:
+            if path.name.startswith(name):
+                found.add(name)
+                path = path.resolve(strict=True)
+                if not path.is_relative_to(prefix):
+                    raise RuntimeError('Mesa library outside candidate prefix: ' + str(path))
+                libraries.add(path)
+    missing = set(required) - found
+    if missing:
+        raise RuntimeError('Missing live Mesa library mappings: ' + ', '.join(sorted(missing)))
+    for path in sorted(libraries):
+        with path.open('rb') as library:
+            digest = hashlib.file_digest(library, 'sha256').hexdigest()
+        print(f'MESA_LIBRARY={path}\nMESA_LIBRARY_SHA256={digest}', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--device', help='DRM node; defaults to the Nouveau render node')
     parser.add_argument('--require-tegra', action='store_true', help='refuse a non-Tegra device')
     parser.add_argument('--iterations', type=int, default=16)
     parser.add_argument('--trace', action='store_true', help='print completed EGL stages and GL operations to stderr')
+    parser.add_argument('--expected-mesa-prefix', type=Path,
+                        help='require live EGL Mesa, GBM and Gallium libraries to come from this candidate directory')
     args = parser.parse_args()
     if not 1 <= args.iterations <= 1000:
         parser.error('iterations must be between 1 and 1000')
@@ -122,6 +152,8 @@ def main():
         print(f'EGL_VERSION={major.value}.{minor.value}\nRENDERER={renderer}', flush=True)
         if any(word in renderer.lower() for word in ('llvmpipe', 'softpipe', 'software')):
             raise RuntimeError('Software renderer does not validate the hardware path')
+        if args.expected_mesa_prefix:
+            verify_mesa_libraries(args.expected_mesa_prefix)
         texture = u()
         gen_tex(1, C.byref(texture))
         trace('glGenTextures')

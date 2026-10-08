@@ -4,6 +4,7 @@ set -euo pipefail
 test "$EUID" = 0
 . /etc/os-release
 test "$ID" = debian && test "$VERSION_CODENAME" = trixie
+test "$(dpkg --print-architecture)" = amd64
 dpkg --add-architecture armhf
 cat > /etc/apt/sources.list.d/mocha-build-backports.sources <<'EOF'
 Types: deb
@@ -17,7 +18,7 @@ apt-get -o DPkg::Lock::Timeout=600 -y --no-install-recommends install \
   git curl python3 python3-mako python3-yaml python3-packaging patch bison flex \
   build-essential clang libclang-dev meson ninja-build pkg-config cmake \
   g++-arm-linux-gnueabihf wayland-protocols libwayland-bin \
-  libsdbus-c++-dev:armhf libwayland-dev:armhf libfreetype-dev:armhf \
+  libsdbus-c++-dev:armhf libwayland-dev:armhf libwayland-egl-backend-dev:armhf libfreetype-dev:armhf \
   libfontconfig-dev:armhf libcairo2-dev:armhf libpango1.0-dev:armhf \
   libharfbuzz-dev:armhf librsvg2-dev:armhf libxkbcommon-dev:armhf \
   libglib2.0-dev:armhf libsecret-1-dev:armhf libsodium-dev:armhf \
