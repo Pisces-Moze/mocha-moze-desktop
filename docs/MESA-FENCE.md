@@ -73,3 +73,5 @@ timeout 45s python3 tools/probe-egl-fence.py --device /dev/dri/cardTEGRA \
 2026-10-10 后续：原始 core-enabled native 内核恢复 native5 控制归属并手动设置 A=0/B=768 后，GPU DMA-BUF 色块实机可见、位置正常（1785 帧／60.018 秒／29.74 FPS）。在该组合上，已安装的 Niri 26.04 使用候选 Mesa 和真实 Tegra renderD128/card1，蓝色背景与 foot 终端由用户确认完全正常；实际进程映射的 EGL Mesa、GBM、Gallium 三类库均来自候选目录，SHA256 已核对。180 秒限时会话因预期 SIGTERM 结束，未见此前 SIGSEGV/core；TTY 启动器返回 1，Niri 的干净退出码未确认。Niri 二进制的源码 commit 未确认，不能当作本分支完整重建验收。
 
 Niri modeset 后仍需手动校正分段；两版自动驱动候选，以及新内核关闭校正属性的对照都黑屏，原始内核可见结果已复现。block-linear TEST_ONLY 的 EINVAL 仍在，本次使用既有线性回退。此结果支持候选 Mesa 的实际原生 Niri 渲染，未覆盖自动分段、Noctalia 全会话、触控、长期稳定性或改名后的安装。完整证据见总入口 RAM 记录中的 native5 GPU/Niri JSON。
+
+2026-10-10 重建原始 DSI 驱动的 RAM 基线：首次 CPU/GPU 色块黑屏，DRM DPMS 关闭再开启后四色恢复。手动校正分段后 GPU 1801 帧／60.001 秒／30.02 FPS，Niri＋持续更新的 foot 终端画面均由用户确认正常；三类候选库的进程映射与 SHA256 已核对，180 秒限时结束收到 SIGTERM，未见新 SIGSEGV/core，干净退出码未确认。与先前成功内核的 payload 对照只有 34 字节构建元数据不同，机器指令相同；该结果支持初始化状态/时序排查，不能归因于编译器指令差异，也不代表自动分段通过。见 [重建基线对照](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/diagnostics/2026-10-10-native-baseline-dpms.json)。
