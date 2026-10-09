@@ -50,7 +50,7 @@ timeout 45s python3 tools/probe-egl-fence.py --iterations 32
 MESA_LOADER_DRIVER_OVERRIDE=tegra timeout 45s python3 tools/probe-egl-fence.py --trace --iterations 1
 ```
 
-临时 native 引导后，根据 `/sys/class/drm/card*/device/driver` 找到 **tegra** KMS 节点，显式传入它以覆盖包装层。不要拿 Nouveau 的成功结果替代这一步：
+临时 native 引导后，显式传入 Tegra DRM 节点以覆盖包装层。探针用 libdrm 的 `drmGetVersion` 检查驱动名；Tegra 的 host1x sysfs 驱动目录实际叫 `drm`，不能用目录名判断为非 Tegra。不要拿 Nouveau 的成功结果替代这一步：
 
 ```sh
 candidate=/srv/mocha-data/mesa-fence-candidate
@@ -67,3 +67,5 @@ timeout 45s python3 tools/probe-egl-fence.py --device /dev/dri/cardTEGRA \
 在现有 simpledrm 内核上，也可对候选库单独设置 `MESA_LOADER_DRIVER_OVERRIDE=tegra`，并用 Nouveau render node 重跑包装层 fence 测试；沿用上述候选库环境，省略 `--device` / `--require-tegra`，保留 `--expected-mesa-prefix`。这一步可复核修复是否消除包装层崩溃，仍不覆盖原生 KMS、DMA-BUF 扫描输出或物理面板。
 
 最后在物理 tty1 上用同一候选库启动 Niri，保存 journal、检查双侧画面、旋转 damage、触控与稳定运行。单独的 fence 测试通过不解决 block-linear TEST_ONLY 的 EINVAL，也不证明原生桌面、控制台位置或音频已修复。通过临时验收后再讨论默认引导和系统库安装。
+
+2026-10-10 在新内核 `6.12.111-moze.1-native` 的只读 RAM 系统中，真实 Tegra `renderD128`、Nouveau `renderD129` 以及 Nouveau 节点上的 Tegra 包装层三组各通过 32 轮候选库回归。`--require-tegra` 接受实际 Tegra，仍拒绝 Nouveau。另一个 GPU DMA-BUF/KMS 测试完成 1800 次翻页、约 29.99 FPS，用户确认背光亮但黑屏；CPU framebuffer 色块也黑屏。原生面板输出尚未通过，尚未运行 Niri 实机验收。记录见总入口的 [RAM 验证](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/DIAGNOSTICS-2026-10-10.md)。

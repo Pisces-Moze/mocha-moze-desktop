@@ -22,7 +22,31 @@ def bind(lib, name, result, *args):
 
 
 def driver(node):
-    return (Path('/sys/class/drm') / Path(node).name / 'device/driver').resolve().name
+    # Tegra's host1x sysfs driver is called "drm"; query the DRM ABI name.
+    class Version(C.Structure):
+        _fields_ = [
+            ('major', C.c_int), ('minor', C.c_int), ('patchlevel', C.c_int),
+            ('name_len', C.c_int), ('name', C.c_char_p),
+            ('date_len', C.c_int), ('date', C.c_char_p),
+            ('desc_len', C.c_int), ('desc', C.c_char_p),
+        ]
+    drm = C.CDLL('libdrm.so.2')
+    get_version = bind(drm, 'drmGetVersion', C.POINTER(Version), C.c_int)
+    free_version = bind(drm, 'drmFreeVersion', None, C.POINTER(Version))
+    path = Path(node)
+    if not path.is_absolute():
+        path = Path('/dev/dri') / path.name
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC)
+    version = None
+    try:
+        version = get_version(fd)
+        if not version or not version.contents.name:
+            raise RuntimeError('Cannot identify DRM driver: ' + str(path))
+        return version.contents.name.decode('ascii')
+    finally:
+        if version:
+            free_version(version)
+        os.close(fd)
 
 
 def verify_mesa_libraries(prefix):
