@@ -4,7 +4,7 @@
 
 历史 native Niri 的 PC=0、LR 位于 `tegra_fence_server_sync`，指向一次空函数指针调用。Mesa `mesa-25.0.7`（commit `742a20f48c59e8649533c84c4d49dd95b403f5da`）源码进一步给出了可复核的原因：Nouveau 的 `nouveau_context_init` / `nvc0_create` 没有设置 `fence_server_sync` 和 `create_fence_fd`，`nouveau_screen_init` 没有设置 `fence_get_fd`；Tegra 包装层却无条件设置对应的转发函数。DRI 的 `dri_server_wait_sync` 检查的是外层非空指针，随后进入包装函数并调用空的底层指针。
 
-`patches/0004-mesa-tegra-optional-fence-callbacks.patch` 只在底层实现回调时注册外层回调，保留 Nouveau 的可选回调约定。它不新增 native sync-file 支持，不修改一直可用的 `fence_reference` / `fence_finish`。实机寄存器确认原有库的空回调调用；候选库已完整交叉构建，并在同一原型机通过 Tegra 包装层回归。native KMS、Niri 与面板验收仍待完成。
+`patches/0004-mesa-tegra-optional-fence-callbacks.patch` 只在底层实现回调时注册外层回调，保留 Nouveau 的可选回调约定。它不新增 native sync-file 支持，不修改一直可用的 `fence_reference` / `fence_finish`。实机寄存器确认原有库的空回调调用；候选库已完整交叉构建，并在同一原型机通过 Tegra 包装层回归。后续原始 native 内核＋手动分段校正的 RAM Niri 画面已由用户确认正常，完整证据与限制见文末；自动分段和完整桌面仍待完成。
 
 源码来源：[Mesa 上游](https://gitlab.freedesktop.org/mesa/mesa/-/tree/mesa-25.0.7)，可使用其 [GitHub 镜像的固定 commit](https://github.com/chaotic-cx/mesa-mirror/tree/742a20f48c59e8649533c84c4d49dd95b403f5da) 对照。补丁保留被修改文件的 MIT 许可与 NVIDIA 版权。
 
@@ -68,4 +68,8 @@ timeout 45s python3 tools/probe-egl-fence.py --device /dev/dri/cardTEGRA \
 
 最后在物理 tty1 上用同一候选库启动 Niri，保存 journal、检查双侧画面、旋转 damage、触控与稳定运行。单独的 fence 测试通过不解决 block-linear TEST_ONLY 的 EINVAL，也不证明原生桌面、控制台位置或音频已修复。通过临时验收后再讨论默认引导和系统库安装。
 
-2026-10-10 在新内核 `6.12.111-moze.1-native` 的只读 RAM 系统中，真实 Tegra `renderD128`、Nouveau `renderD129` 以及 Nouveau 节点上的 Tegra 包装层三组各通过 32 轮候选库回归。`--require-tegra` 接受实际 Tegra，仍拒绝 Nouveau。另一个 GPU DMA-BUF/KMS 测试完成 1800 次翻页、约 29.99 FPS，用户确认背光亮但黑屏；CPU framebuffer 色块也黑屏。原生面板输出尚未通过，尚未运行 Niri 实机验收。记录见总入口的 [RAM 验证](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/DIAGNOSTICS-2026-10-10.md)。
+2026-10-10 在新内核 `6.12.111-moze.1-native` 的只读 RAM 系统中，真实 Tegra `renderD128`、Nouveau `renderD129` 以及 Nouveau 节点上的 Tegra 包装层三组各通过 32 轮候选库回归。`--require-tegra` 接受实际 Tegra，仍拒绝 Nouveau。另一个 GPU DMA-BUF/KMS 测试完成 1800 次翻页、约 29.99 FPS，用户确认背光亮但黑屏；CPU framebuffer 色块也黑屏。该首轮原生面板输出未通过，尚未运行 Niri；后续成功的原始内核＋手动校正对照见下文。记录见总入口的 [RAM 验证](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/DIAGNOSTICS-2026-10-10.md)。
+
+2026-10-10 后续：原始 core-enabled native 内核恢复 native5 控制归属并手动设置 A=0/B=768 后，GPU DMA-BUF 色块实机可见、位置正常（1785 帧／60.018 秒／29.74 FPS）。在该组合上，已安装的 Niri 26.04 使用候选 Mesa 和真实 Tegra renderD128/card1，蓝色背景与 foot 终端由用户确认完全正常；实际进程映射的 EGL Mesa、GBM、Gallium 三类库均来自候选目录，SHA256 已核对。180 秒限时会话因预期 SIGTERM 结束，未见此前 SIGSEGV/core；TTY 启动器返回 1，Niri 的干净退出码未确认。Niri 二进制的源码 commit 未确认，不能当作本分支完整重建验收。
+
+Niri modeset 后仍需手动校正分段；两版自动驱动候选，以及新内核关闭校正属性的对照都黑屏，原始内核可见结果已复现。block-linear TEST_ONLY 的 EINVAL 仍在，本次使用既有线性回退。此结果支持候选 Mesa 的实际原生 Niri 渲染，未覆盖自动分段、Noctalia 全会话、触控、长期稳定性或改名后的安装。完整证据见总入口 RAM 记录中的 native5 GPU/Niri JSON。

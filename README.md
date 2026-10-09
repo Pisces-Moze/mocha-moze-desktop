@@ -250,7 +250,7 @@ UI 用 `cairo_image_surface` 在内存里画 720×520 的电池图形，按 fram
 
 `0003` 修掉横屏 damage 造成的贯穿黑条与残影，但它没法单独消除跨 GPU 的输出复制。
 
-native Tegra + Nouveau 线性 DMA-BUF 的色块实机出图约 29.8 FPS，Niri 仍在 Mesa 的 `tegra_fence_server_sync` 调用点崩溃，所以没有默认启用。
+native Tegra + Nouveau 线性 DMA-BUF 的色块实机出图约 29.8 FPS。2026-10-10 原始内核＋native5 DTB＋手动分段校正的复测为 29.74 FPS；候选 Mesa 下的 Niri＋终端画面由用户确认正常。新镜像自动分段仍失败，完整桌面与安装未验收，未默认启用。
 
 软件 H.264 / Firefox 播放已经验证过，硬件解码与编码尚未完成。
 
@@ -258,7 +258,7 @@ native Tegra + Nouveau 线性 DMA-BUF 的色块实机出图约 29.8 FPS，Niri �
 
 | 事项 | 状态 | 出处 |
 | --- | --- | --- |
-| native 桌面路径 | Niri 在 Mesa `tegra_fence_server_sync` 崩溃，未默认启用 | 仓库 README 性能章节、`services/README.md` |
+| native 桌面路径 | 候选 Mesa＋原始内核＋手动校正的独立 RAM Niri 画面正常；自动分段与完整桌面待完成，未默认启用 | 仓库 README 性能章节、`services/README.md` |
 | 硬件解码 / 编码 | 未完成，只有软件 H.264 验证过 | 仓库 README 性能章节 |
 | 音频硬件 | 现代内核无完整 RT5671 声卡，服务正常不代表出声 | `services/README.md` |
 | APP 分区扩容 / 完整桌面 rootfs 迁移 | 尚无通过实机验收的自动方案 | 仓库 README 设备安装章节 |
