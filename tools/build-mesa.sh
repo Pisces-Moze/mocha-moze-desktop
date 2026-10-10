@@ -29,5 +29,14 @@ meson setup "$out/build" "$src" \
  -Dgallium-opencl=disabled -Dvideo-codecs=[] -Dtools=[]
 ninja -C "$out/build" -j"${JOBS:-4}"
 DESTDIR="$out/stage" meson install -C "$out/build" --no-rebuild
+# Mesa installs the combined Gallium DRI target as libgallium-25.0.7.so.
+# The loader still looks for a driver-specific *_dri.so entry point; without
+# these links EGL silently falls back to llvmpipe or fails eglInitialize.
+dri_dir="$out/stage/opt/mocha-mesa-candidate/lib/arm-linux-gnueabihf/dri"
+gallium="$out/stage/opt/mocha-mesa-candidate/lib/arm-linux-gnueabihf/libgallium-25.0.7.so"
+test -s "$gallium"
+mkdir -p "$dri_dir"
+ln -s ../libgallium-25.0.7.so "$dri_dir/tegra_dri.so"
+ln -s ../libgallium-25.0.7.so "$dri_dir/nouveau_dri.so"
 (cd "$out/stage"; find . -type f -print0 | sort -z | xargs -0 sha256sum > "$out/SHA256SUMS")
 printf '%s\n' 'Staged candidate built; full native desktop/panel acceptance is still required.'

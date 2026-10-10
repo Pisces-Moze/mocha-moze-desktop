@@ -38,6 +38,8 @@ bash tools/build-mesa.sh /path/to/mesa-25.0.7 /path/to/artifacts/mesa-fence
 
 构建脚本生成 `stage/opt/mocha-mesa-candidate` 与 `SHA256SUMS`，不会安装到主机或平板的系统库目录。只有完成构建后，才把 stage 中的候选目录放到平板数据分区的独立目录；不要放进仅剩约 41 MB 的 APP 分区。
 
+构建脚本还会在 `lib/arm-linux-gnueabihf/dri/` 创建 `tegra_dri.so` 和 `nouveau_dri.so` 到同目录 `libgallium-25.0.7.so` 的符号链接。Mesa 将两个 Gallium 驱动合并进这个目标文件，但 DRI loader 仍按驱动名查找 `*_dri.so`；缺少入口时 Noctalia 会退回 llvmpipe，或在候选 `libEGL_mesa` 下直接报 `eglInitialize failed`。符号链接不纳入文件哈希清单，部署时必须保留。
+
 ## 板上验收
 
 先用原有系统库跑对照；脚本只读取 DRM 节点并创建自己的 GBM/EGL 上下文，不取得 DRM master、不 modeset、不终止桌面。默认查找 Nouveau render node，不依赖固定编号：
