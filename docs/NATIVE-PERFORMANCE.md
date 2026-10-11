@@ -86,6 +86,8 @@ python3 performance/summarize-frame-profile.py /path/to/profile-native-sync.log
 
 窗口基准被提前关闭或 Wayland 连接断开时返回失败；会话脚本还要求唯一的 `NATIVE_COLOR_FRAMES` 结束记录与请求帧数一致。仅进程退出码为零、只有 GPU 信息或帧数不足均不能通过，失败后仍恢复原桌面。
 
+测试入口通过临时 `niri` 符号链接执行已校验候选，让使用 `pidof niri` 的 GPU 策略识别合成器；`/proc/PID/exe` 仍必须等于实际候选文件。直接执行名为 `niri-native-fencing` 的程序会让原策略退回 auto，不能把这种结果当作 852 MHz 对照。测试期间另外核对策略日志、实际 pstate、供电和温度；进程名正确不保证频率一直保持高档。
+
 帧统计器拒绝缺字段、非有限/负数时间和缺失 `needs_sync` 的记录；P50/P95/P99 使用 nearest-rank，结果带算法名称。比较旧数据时应重新汇总原始日志，避免不同百分位算法的边界差异。
 
 验证脚本本身：`python3 tools/test-frame-profile.py` 检查日志完整性与统计；Linux 上运行 `python3 tools/test-installed-profile.py`，在隔离的 systemd/proc/sysfs 模拟环境检查两种库环境、含空格和单引号的路径、旧内核拒绝、已有配置保留、启动/基准失败、陈旧 socket 和 TERM 后恢复。这些回归不替代真实原生桌面验收。

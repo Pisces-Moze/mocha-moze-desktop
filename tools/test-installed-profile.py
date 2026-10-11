@@ -50,6 +50,7 @@ esac
 BINARY = r'''#!/bin/sh
 # MOCHA_FRAME / KMS explicit fence capability
 if test "${1:-}" = --config; then
+    printf '%s\n' "$0" > "$TEST_ROOT/compositor-executable"
     printf '%s\n' "$LD_LIBRARY_PATH" "$LIBGL_DRIVERS_PATH" "$GBM_BACKENDS_PATH" "${MOCHA_NATIVE_FENCE:-unset}" > "$TEST_ROOT/compositor-env"
     printf '%s\n' "$@" > "$TEST_ROOT/compositor-args"
 fi
@@ -149,6 +150,7 @@ class InstalledProfileTest(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
             else:
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(Path((root / 'compositor-executable').read_text().strip()).name, 'niri')
                 self.assertEqual((root / 'compositor-env').read_text(), (root / 'benchmark-env').read_text())
                 expected_fence = '1' if mode == 'native-sync' else 'unset'
                 self.assertEqual((root / 'benchmark-env').read_text().splitlines()[-1], expected_fence)

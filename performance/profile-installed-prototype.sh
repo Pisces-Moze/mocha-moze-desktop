@@ -73,6 +73,9 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 chmod 755 "$work"
+# Keep the real compositor name for the installed GPU policy's pidof check.
+# /proc/PID/exe still resolves to the verified candidate binary.
+ln -s "$profile_binary" "$work/niri"
 # One quoted environment file is shared by compositor and benchmark.
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 assignment() { printf 'export %s=' "$1"; quote "$2"; printf '\n'; }
@@ -89,7 +92,7 @@ assignment() { printf 'export %s=' "$1"; quote "$2"; printf '\n'; }
     echo 'set -eu'
     printf '. '; quote "$work/library-env"; printf '\n'
     echo 'export MOCHA_FRAME_PROFILE=1 RUST_LOG=info,smithay::backend::drm::compositor=debug'
-    printf 'exec '; quote "$profile_binary"; printf ' --config '; quote "$candidate/niri.kdl"; printf ' "$@"\n'
+    printf 'exec '; quote "$work/niri"; printf ' --config '; quote "$candidate/niri.kdl"; printf ' "$@"\n'
 } > "$work/niri-entry"
 sh -n "$work/library-env"
 sh -n "$work/niri-entry"
