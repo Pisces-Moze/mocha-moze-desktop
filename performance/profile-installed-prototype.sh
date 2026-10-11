@@ -7,7 +7,9 @@ profile_binary=${MOCHA_PROFILE_NIRI:-/tmp/niri-frame-profile}
 sync_stage=${MOCHA_NATIVE_SYNC_STAGE:-/tmp/native-sync-stage}
 bench_binary=${MOCHA_PROFILE_BENCH:-/tmp/native-frame-timing}
 frames=${MOCHA_PROFILE_BENCH_FRAMES:-0}
+log_frames=${MOCHA_PROFILE_FRAMES:-1}
 fail() { echo "$*" >&2; exit 1; }
+case "$log_frames" in 0|1) ;; *) fail 'MOCHA_PROFILE_FRAMES must be 0 or 1';; esac
 test "$(id -u)" = 0 || fail 'root required'
 case "$frames" in ''|*[!0-9]*) fail 'invalid benchmark frame count';; esac
 test "$frames" -eq 0 || { test "$frames" -ge 120 && test "$frames" -le 36000; } || fail 'benchmark frames must be 0 or 120..36000'
@@ -91,7 +93,8 @@ assignment() { printf 'export %s=' "$1"; quote "$2"; printf '\n'; }
     echo '#!/bin/sh'
     echo 'set -eu'
     printf '. '; quote "$work/library-env"; printf '\n'
-    echo 'export MOCHA_FRAME_PROFILE=1 RUST_LOG=info,smithay::backend::drm::compositor=debug'
+    if test "$log_frames" = 1; then echo 'export MOCHA_FRAME_PROFILE=1'; else echo 'unset MOCHA_FRAME_PROFILE'; fi
+    echo 'export RUST_LOG=info,smithay::backend::drm::compositor=debug'
     printf 'exec '; quote "$work/niri"; printf ' --config '; quote "$candidate/niri.kdl"; printf ' "$@"\n'
 } > "$work/niri-entry"
 sh -n "$work/library-env"
@@ -131,7 +134,11 @@ if test "$frames" -gt 0; then
 fi
 journalctl _UID=1000 _SYSTEMD_USER_UNIT=niri.service --since="$start" -o cat --no-pager > "$result/journal.log"
 grep 'KMS explicit fence capability' "$result/journal.log" > "$result/capability.log" || fail 'no fencing capability evidence'
-grep 'MOCHA_FRAME ' "$result/journal.log" > "$result/profile-$mode.log" || fail 'no frame profile evidence'
 cat "$result/capability.log"
-wc -l "$result/profile-$mode.log"
-tail -n 4 "$result/profile-$mode.log"
+if test "$log_frames" = 1; then
+    grep 'MOCHA_FRAME ' "$result/journal.log" > "$result/profile-$mode.log" || fail 'no frame profile evidence'
+    wc -l "$result/profile-$mode.log"
+    tail -n 4 "$result/profile-$mode.log"
+else
+    echo FRAME_PROFILE_DISABLED
+fi

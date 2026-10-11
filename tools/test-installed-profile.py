@@ -43,7 +43,7 @@ systemctl)
     ;;
 journalctl)
     echo 'KMS explicit fence capability driver=tegra supports_fencing=true legacy=false'
-    echo 'MOCHA_FRAME elements_ms=0.1 render_ms=0.2 wait_ms=0.0 queue_ms=0.1 total_ms=0.4 needs_sync=false elements=3'
+    if test "${MOCHA_PROFILE_FRAMES:-1}" = 1; then echo 'MOCHA_FRAME elements_ms=0.1 render_ms=0.2 wait_ms=0.0 queue_ms=0.1 total_ms=0.4 needs_sync=false elements=3'; fi
     ;;
 esac
 '''
@@ -51,6 +51,7 @@ BINARY = r'''#!/bin/sh
 # MOCHA_FRAME / KMS explicit fence capability
 if test "${1:-}" = --config; then
     printf '%s\n' "$0" > "$TEST_ROOT/compositor-executable"
+    printf '%s\n' "${MOCHA_FRAME_PROFILE:-unset}" > "$TEST_ROOT/frame-profile-env"
     printf '%s\n' "$LD_LIBRARY_PATH" "$LIBGL_DRIVERS_PATH" "$GBM_BACKENDS_PATH" "${MOCHA_NATIVE_FENCE:-unset}" > "$TEST_ROOT/compositor-env"
     printf '%s\n' "$@" > "$TEST_ROOT/compositor-args"
 fi
@@ -72,7 +73,7 @@ def executable(path, text):
 
 @unittest.skipUnless(os.name == 'posix', 'Linux shell and Unix sockets required')
 class InstalledProfileTest(unittest.TestCase):
-    def run_case(self, mode='native-sync', fail='', old_override=False, kernel=None):
+    def run_case(self, mode='native-sync', fail='', old_override=False, kernel=None, log_frames='1'):
         with tempfile.TemporaryDirectory(prefix='mocha-profile-test-') as directory:
             root = Path(directory)
             runtime = root / 'run'
@@ -123,6 +124,8 @@ class InstalledProfileTest(unittest.TestCase):
                    'MOCHA_CANDIDATE': str(candidate), 'MOCHA_PROFILE_NIRI': str(binary),
                    'MOCHA_NATIVE_SYNC_STAGE': str(sync), 'MOCHA_PROFILE_BENCH': str(bench),
                    'MOCHA_PROFILE_BENCH_FRAMES': '600', 'MOCHA_NATIVE_FENCE': 'stale-inherited-value'}
+            env['MOCHA_PROFILE_FRAMES'] = log_frames
+            env['MOCHA_FRAME_PROFILE'] = 'stale-inherited-value'
             if kernel:
                 env['TEST_KERNEL'] = kernel
             sockets = []
@@ -151,6 +154,10 @@ class InstalledProfileTest(unittest.TestCase):
             else:
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(Path((root / 'compositor-executable').read_text().strip()).name, 'niri')
+                self.assertEqual((root / 'frame-profile-env').read_text().strip(), '1' if log_frames == '1' else 'unset')
+                if log_frames == '0':
+                    self.assertIn('FRAME_PROFILE_DISABLED', result.stdout)
+                    self.assertFalse(list((root / 'results').glob('*/profile-*.log')))
                 self.assertEqual((root / 'compositor-env').read_text(), (root / 'benchmark-env').read_text())
                 expected_fence = '1' if mode == 'native-sync' else 'unset'
                 self.assertEqual((root / 'benchmark-env').read_text().splitlines()[-1], expected_fence)
@@ -163,6 +170,9 @@ class InstalledProfileTest(unittest.TestCase):
 
     def test_baseline_clears_inherited_native_fence(self):
         self.run_case(mode='baseline')
+
+    def test_unlogged_benchmark_clears_inherited_frame_profile(self):
+        self.run_case(log_frames='0')
 
     def test_refuse_fallback_before_service_changes(self):
         self.run_case(kernel='6.12.111-mocha-experimental-fbdiag')

@@ -11,8 +11,8 @@
 | 0005 | Mesa reset/scissor | 对缺失 reset 回调返回正常状态，修复旋转损伤的 scissor；已有实机检查 |
 | 0006 | Mesa Tegra scanout modifier alias | 精确映射既有线性/块布局表示；格式边界仍需扩展验证 |
 | 0007 | Mesa GK20A WC GPU BO | 图片、GPU 私有堆及 CPU-write/GPU-read 上传缓冲使用 coherent BO 接口；保留 CPU readback staging cached |
-| 0008 | Mesa GK20A native sync_file | 实验，构建和运行均 opt-in；独立 EGL/KMS 通过，完整合成器待测 |
-| 0009 | Smithay Tegra explicit fence 检测 | 新候选，按驱动名而非厂商描述识别闭源 NVIDIA；完整构建/实机验证待完成 |
+| 0008 | Mesa GK20A native sync_file | 实验，构建和运行均 opt-in；独立 EGL/KMS 与 10 月 12 日有限 Niri/Noctalia profile 通过，长期/多应用仍待测 |
+| 0009 | Smithay Tegra explicit fence 检测 | 按驱动名而非厂商描述识别闭源 NVIDIA；全新 release 构建与有限原生桌面 profile 已验证 |
 | 0010 | Noctalia 可选 EGL robustness 开关 | 默认保持原逻辑；环境变量 `NOCTALIA_DISABLE_EGL_ROBUSTNESS=1` 才禁用 |
 | 0011 | Niri frame profile | 可选插桩，`MOCHA_FRAME_PROFILE=1` 才打印帧记录 |
 
@@ -94,6 +94,10 @@ python3 performance/summarize-frame-profile.py /path/to/profile-native-sync.log
 
 需要核对 `driver=tegra supports_fencing=true legacy=false`、合成帧的 `needs_sync=false` 与 wait_ms=0、真实候选 Gallium/EGL/GBM 映射、无同步/queue 错误，并比较 render/queue/total/P95/P99。仅 FPS 或 EGL 扩展名不够。debug/Profile 输出本身也有开销，随后关闭逐帧日志再做帧时间对照。
 
-已验证 WC+852MHz 的 600 帧窗口测试约 60.042FPS，P95 17.014ms，P99 17.469ms，无 >25ms；旧 Smithay 完整 UI profile 全部仍需要 CPU wait。新 Smithay 候选尚未通过实机，此分支保留为草稿。原型机的真实版本哈希以总入口 JSON 为准。
+相同脚本设置 `MOCHA_PROFILE_FRAMES=0` 可关闭逐帧插桩（显式清除继承的 `MOCHA_FRAME_PROFILE`），配合 `MOCHA_PROFILE_BENCH_FRAMES=600` 做窗口基准；仍要求完整基准结束记录、候选实际映射、KMS capability 和服务恢复。该模式输出 `FRAME_PROFILE_DISABLED`，不能产生逐帧等待统计；启动和 capability 的日志仍开启。
+
+10 月 11 日已验证 WC+852MHz 的 600 帧窗口测试约 60.042FPS，P95 17.014ms，P99 17.469ms，无 >25ms；旧 Smithay 完整 UI profile 全部仍需要 CPU wait。
+
+10 月 12 日全新 Niri＋native-sync Mesa 的有限原生桌面 profile 已通过：`driver=tegra supports_fencing=true legacy=false`，1125 帧均 `needs_sync=false`，wait_ms 全部为零；WC 对照 1121 帧均需要等待。相同 Niri 的 total_ms P95/P99 从 11.624/14.773 降为 9.393/12.073 ms；600 帧窗口基准两组仍约 60 FPS，native-sync 的窗口 P99 略高，不能描述为所有帧时间都改善。用户确认画面正常，实际 Gallium/EGL/GBM 映射已核对；没有更换默认引导或启用 PMU 实验模块。记录见 [10 月 12 日验证](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/DIAGNOSTICS-2026-10-12.md)。多应用、长时运行和 DPMS/电源插拔仍待测，此分支保留为草稿。
 
 功耗/温度采样使用 `python3 performance/sample-power-thermal.py --seconds 120 > power-thermal.jsonl`，单进程读取 sysfs，避免高频 fork 的观测开销。逐帧 profile 与无 profile 帧时间对照分别保存。
