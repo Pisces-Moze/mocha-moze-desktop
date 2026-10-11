@@ -1,0 +1,225 @@
+--- a/src/gallium/drivers/nouveau/nouveau_fence.c
++++ b/src/gallium/drivers/nouveau/nouveau_fence.c
+@@ -25,6 +25,11 @@
+ #include "nouveau_winsys.h"
+ #include "nouveau_fence.h"
+ #include "util/os_time.h"
++#include "util/os_file.h"
++#include <libsync.h>
++#include <linux/dma-buf.h>
++#include <unistd.h>
++#include <xf86drm.h>
+ 
+ #if DETECT_OS_POSIX
+ #include <sched.h>
+@@ -46,6 +51,7 @@
+       return false;
+    }
+ 
++   (*fence)->sync_fd = -1;
+    (*fence)->screen = nv->screen;
+    (*fence)->context = nv;
+    (*fence)->ref = 1;
+@@ -125,6 +131,8 @@
+       nouveau_fence_trigger_work(fence);
+    }
+ 
++   if (fence->sync_fd >= 0)
++      close(fence->sync_fd);
+    nouveau_bo_ref(NULL, &fence->bo);
+    FREE(fence);
+ }
+@@ -200,6 +208,9 @@
+ 
+    simple_mtx_assert_locked(&screen->fence.lock);
+ 
++   if (fence->sync_fd >= 0)
++      return sync_wait(fence->sync_fd, 0) == 0;
++
+    if (fence->state == NOUVEAU_FENCE_STATE_SIGNALLED)
+       return true;
+ 
+@@ -249,6 +260,9 @@
+    int64_t start = 0;
+ 
+    simple_mtx_assert_locked(&fence_list->lock);
++
++   if (fence->sync_fd >= 0)
++      return sync_wait(fence->sync_fd, -1) == 0;
+ 
+    if (debug && debug->debug_message)
+       start = os_time_get_nano();
+@@ -279,6 +293,91 @@
+    return true;
+ }
+ 
++
++/* The per-fence BO is referenced read/write by the submitted pushbuffer.
++ * Export its dma_resv fence after submission, without waiting on the CPU.
++ * Do not export the shared query BO, which can include unrelated later work.
++ */
++static int
++nouveau_bo_export_sync_file(struct nouveau_bo *bo)
++{
++   int dmabuf = -1;
++   if (nouveau_bo_set_prime(bo, &dmabuf))
++      return -1;
++   struct dma_buf_export_sync_file export = {
++      .flags = DMA_BUF_SYNC_RW,
++      .fd = -1,
++   };
++   int ret = drmIoctl(dmabuf, DMA_BUF_IOCTL_EXPORT_SYNC_FILE, &export);
++   close(dmabuf);
++   return ret ? -1 : export.fd;
++}
++
++bool
++nouveau_native_sync_supported(struct nouveau_screen *screen)
++{
++   /* Opt-in until both standalone and compositor tests pass on GK20A. */
++   const char *enable = getenv("MOCHA_NATIVE_FENCE");
++   if (screen->device->chipset != 0xea || !enable || strcmp(enable, "1"))
++      return false;
++   struct nouveau_bo *bo = NULL;
++   if (nouveau_bo_new(screen->device, NOUVEAU_BO_GART, 4096, 4096, NULL, &bo))
++      return false;
++   int fd = nouveau_bo_export_sync_file(bo);
++   nouveau_bo_ref(NULL, &bo);
++   if (fd < 0)
++      return false;
++   close(fd);
++   return true;
++}
++
++int
++nouveau_fence_get_fd(struct pipe_screen *pscreen,
++                     struct pipe_fence_handle *pfence)
++{
++   struct nouveau_fence *fence = nouveau_fence(pfence);
++   if (!fence)
++      return -1;
++   if (fence->sync_fd >= 0)
++      return os_dupfd_cloexec(fence->sync_fd);
++   simple_mtx_lock(&fence->screen->fence.lock);
++   int fd = nouveau_fence_kick(fence) ? nouveau_bo_export_sync_file(fence->bo) : -1;
++   simple_mtx_unlock(&fence->screen->fence.lock);
++   return fd;
++}
++
++void
++nouveau_create_fence_fd(struct pipe_context *pipe,
++                        struct pipe_fence_handle **pfence,
++                        int fd, enum pipe_fd_type type)
++{
++   *pfence = NULL;
++   if (type != PIPE_FD_TYPE_NATIVE_SYNC)
++      return;
++   struct nouveau_fence *fence = CALLOC_STRUCT(nouveau_fence);
++   if (!fence)
++      return;
++   fence->sync_fd = os_dupfd_cloexec(fd);
++   if (fence->sync_fd < 0) {
++      FREE(fence);
++      return;
++   }
++   fence->screen = nouveau_context(pipe)->screen;
++   fence->ref = 1;
++   list_inithead(&fence->work);
++   *pfence = (struct pipe_fence_handle *)fence;
++}
++
++void
++nouveau_fence_server_sync(struct pipe_context *pipe,
++                          struct pipe_fence_handle *pfence)
++{
++   /* External input dependencies retain a real wait. Output fences are
++    * exported asynchronously for the KMS IN_FENCE_FD path above. */
++   if (pfence && !nouveau_fence_wait(nouveau_fence(pfence), NULL))
++      debug_printf("nouveau: failed to wait for an imported native fence\n");
++}
++
+ void
+ _nouveau_fence_next(struct nouveau_context *nv)
+ {
+--- a/src/gallium/drivers/nouveau/nouveau_fence.h
++++ b/src/gallium/drivers/nouveau/nouveau_fence.h
+@@ -25,6 +25,7 @@
+    struct nouveau_screen *screen;
+    struct nouveau_context *context;
+    struct nouveau_bo *bo;
++   int sync_fd; /* owned imported sync_file; -1 for a GPU fence */
+    int state;
+    int ref;
+    uint32_t sequence;
+@@ -68,6 +69,12 @@
+ bool nouveau_fence_signalled(struct nouveau_fence *);
+ void nouveau_fence_ref(struct nouveau_fence *, struct nouveau_fence **);
+ 
++bool nouveau_native_sync_supported(struct nouveau_screen *screen);
++int nouveau_fence_get_fd(struct pipe_screen *, struct pipe_fence_handle *);
++void nouveau_create_fence_fd(struct pipe_context *, struct pipe_fence_handle **,
++                             int fd, enum pipe_fd_type type);
++void nouveau_fence_server_sync(struct pipe_context *, struct pipe_fence_handle *);
++
+ void nouveau_fence_unref_bo(void *data); /* generic unref bo callback */
+ 
+ static inline struct nouveau_fence *
+--- a/src/gallium/drivers/nouveau/nouveau_screen.c
++++ b/src/gallium/drivers/nouveau/nouveau_screen.c
+@@ -16,6 +16,8 @@
+ 
+ #include <stdio.h>
+ #include <errno.h>
++#include <limits.h>
++#include <libsync.h>
+ #include <stdlib.h>
+ 
+ #include "drm-uapi/nouveau_drm.h"
+@@ -92,8 +94,15 @@
+                             struct pipe_fence_handle *pfence,
+                             uint64_t timeout)
+ {
++   struct nouveau_fence *fence = nouveau_fence(pfence);
++   if (fence->sync_fd >= 0) {
++      int ms = timeout == OS_TIMEOUT_INFINITE ? -1 :
++         (timeout / 1000000 >= INT_MAX ? INT_MAX :
++          (int)(timeout / 1000000 + (timeout % 1000000 != 0)));
++      return sync_wait(fence->sync_fd, ms) == 0;
++   }
+    if (!timeout)
+-      return nouveau_fence_signalled(nouveau_fence(pfence));
++      return nouveau_fence_signalled(fence);
+ 
+    return nouveau_fence_wait(nouveau_fence(pfence), NULL);
+ }
+@@ -423,6 +432,7 @@
+ 
+    pscreen->fence_reference = nouveau_screen_fence_ref;
+    pscreen->fence_finish = nouveau_screen_fence_finish;
++   pscreen->fence_get_fd = nouveau_fence_get_fd;
+ 
+    pscreen->query_memory_info = nouveau_query_memory_info;
+    pscreen->get_driver_uuid = nouveau_driver_uuid;
+--- a/src/gallium/drivers/nouveau/nvc0/nvc0_context.c
++++ b/src/gallium/drivers/nouveau/nvc0/nvc0_context.c
+@@ -457,6 +457,10 @@
+    pipe->svm_migrate = nvc0_svm_migrate;
+ 
+    pipe->flush = nvc0_flush;
++   if (pscreen->caps.native_fence_fd) {
++      pipe->create_fence_fd = nouveau_create_fence_fd;
++      pipe->fence_server_sync = nouveau_fence_server_sync;
++   }
+    pipe->texture_barrier = nvc0_texture_barrier;
+    pipe->memory_barrier = nvc0_memory_barrier;
+    pipe->get_sample_position = nvc0_context_get_sample_position;
+--- a/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
++++ b/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
+@@ -282,6 +282,7 @@
+    struct pipe_caps *caps = (struct pipe_caps *)&screen->base.base.caps;
+ 
+    u_init_pipe_screen_caps(&screen->base.base, 1);
++   caps->native_fence_fd = nouveau_native_sync_supported(&screen->base);
+ 
+    const uint16_t class_3d = screen->base.class_3d;
+    struct nouveau_device *dev = screen->base.device;

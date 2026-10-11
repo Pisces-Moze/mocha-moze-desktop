@@ -1,0 +1,108 @@
+--- a/src/gallium/drivers/nouveau/nvc0/nvc0_miptree.c
++++ b/src/gallium/drivers/nouveau/nvc0/nvc0_miptree.c
+@@ -535,6 +535,15 @@
+ 
+    bo_flags = mt->base.domain | NOUVEAU_BO_NOSNOOP;
+ 
++   /* GK20A stores GPU images in system memory. Request the coherent BO
++    * interface so Nouveau uses write-combined CPU mappings on this
++    * non-coherent SoC, instead of cleaning every image page at each submit.
++    * Keep CPU readback staging allocations cached.
++    */
++   if (dev->chipset == 0xea && (bo_flags & NOUVEAU_BO_GART) &&
++       pt->usage != PIPE_USAGE_STAGING && drm->version >= 0x01000202)
++      bo_flags |= NOUVEAU_BO_COHERENT;
++
+    if (mt->base.base.bind & (PIPE_BIND_CURSOR | PIPE_BIND_DISPLAY_TARGET))
+       bo_flags |= NOUVEAU_BO_CONTIG;
+ 
+--- a/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
++++ b/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
+@@ -40,6 +40,22 @@
+ #include "nvc0/mme/comc597.mme.h"
+ 
+ #include "nv50/g80_texture.xml.h"
++
++/* GPU-private heaps have no cached CPU readback users. On non-coherent
++ * GK20A, the coherent BO interface selects write-combined CPU mappings,
++ * avoiding whole-heap cache maintenance at every command submission.
++ */
++static uint32_t
++nvc0_screen_heap_flags(struct nvc0_screen *screen)
++{
++   uint32_t flags = NV_VRAM_DOMAIN(&screen->base);
++
++   if (screen->base.device->chipset == 0xea &&
++       (flags & NOUVEAU_BO_GART) && screen->base.drm->version >= 0x01000202)
++      flags |= NOUVEAU_BO_COHERENT;
++
++   return flags;
++}
+ 
+ static bool
+ nvc0_screen_is_format_supported(struct pipe_screen *pscreen,
+@@ -745,7 +761,7 @@
+ 
+    size = align(size, 1 << 17);
+ 
+-   ret = nouveau_bo_new(screen->base.device, NV_VRAM_DOMAIN(&screen->base), 1 << 17, size,
++   ret = nouveau_bo_new(screen->base.device, nvc0_screen_heap_flags(screen), 1 << 17, size,
+                         NULL, &bo);
+    if (ret)
+       return ret;
+@@ -768,7 +784,7 @@
+    struct nouveau_bo *bo;
+    int ret;
+ 
+-   ret = nouveau_bo_new(screen->base.device, NV_VRAM_DOMAIN(&screen->base),
++   ret = nouveau_bo_new(screen->base.device, nvc0_screen_heap_flags(screen),
+                         1 << 17, size, NULL, &bo);
+    if (ret)
+       return ret;
+@@ -1117,7 +1133,7 @@
+       FAIL_SCREEN_INIT("Error allocating TEXT area: %d\n", ret);
+ 
+    /* 6 user uniform areas, 6 driver areas, and 1 for the runout */
+-   ret = nouveau_bo_new(dev, NV_VRAM_DOMAIN(&screen->base), 1 << 12, 13 << 16, NULL,
++   ret = nouveau_bo_new(dev, nvc0_screen_heap_flags(screen), 1 << 12, 13 << 16, NULL,
+                         &screen->uniform_bo);
+    if (ret)
+       FAIL_SCREEN_INIT("Error allocating uniform BO: %d\n", ret);
+@@ -1172,7 +1188,7 @@
+    PUSH_DATA (push, 0xff << 24);
+ 
+    if (screen->eng3d->oclass < GM107_3D_CLASS) {
+-      ret = nouveau_bo_new(dev, NV_VRAM_DOMAIN(&screen->base), 1 << 17, 1 << 20, NULL,
++      ret = nouveau_bo_new(dev, nvc0_screen_heap_flags(screen), 1 << 17, 1 << 20, NULL,
+                            &screen->poly_cache);
+       if (ret)
+          FAIL_SCREEN_INIT("Error allocating poly cache BO: %d\n", ret);
+@@ -1183,7 +1199,7 @@
+       PUSH_DATA (push, 3);
+    }
+ 
+-   ret = nouveau_bo_new(dev, NV_VRAM_DOMAIN(&screen->base), 1 << 17, 1 << 17, NULL,
++   ret = nouveau_bo_new(dev, nvc0_screen_heap_flags(screen), 1 << 17, 1 << 17, NULL,
+                         &screen->txc);
+    if (ret)
+       FAIL_SCREEN_INIT("Error allocating txc BO: %d\n", ret);
+--- a/src/gallium/drivers/nouveau/nouveau_buffer.c
++++ b/src/gallium/drivers/nouveau/nouveau_buffer.c
+@@ -934,7 +934,16 @@
+ nouveau_scratch_bo_alloc(struct nouveau_context *nv, struct nouveau_bo **pbo,
+                          unsigned size)
+ {
+-   return nouveau_bo_new(nv->screen->device, NOUVEAU_BO_GART | NOUVEAU_BO_MAP,
++   uint32_t flags = NOUVEAU_BO_GART | NOUVEAU_BO_MAP;
++
++   /* Scratch BOs are CPU-write/GPU-read uploads. Avoid cleaning the entire
++    * rotating upload heap for each small vertex update on GK20A.
++    */
++   if (nv->screen->device->chipset == 0xea &&
++       nv->screen->drm->version >= 0x01000202)
++      flags |= NOUVEAU_BO_COHERENT;
++
++   return nouveau_bo_new(nv->screen->device, flags,
+                          4096, size, NULL, pbo);
+ }
+ 

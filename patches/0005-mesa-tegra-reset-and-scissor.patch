@@ -1,0 +1,24 @@
+--- a/src/gallium/drivers/tegra/tegra_context.c
++++ b/src/gallium/drivers/tegra/tegra_context.c
+@@ -736,7 +736,8 @@
+ {
+    struct tegra_context *context = to_tegra_context(pcontext);
+ 
+-   context->gpu->clear(context->gpu, buffers, NULL, color, depth, stencil);
++   context->gpu->clear(context->gpu, buffers, scissor_state, color, depth,
++                       stencil);
+ }
+ 
+ static void
+@@ -1415,8 +1416,10 @@
+    context->base.flush_resource = tegra_flush_resource;
+    context->base.invalidate_resource = tegra_invalidate_resource;
+ 
+-   context->base.get_device_reset_status = tegra_get_device_reset_status;
+-   context->base.set_device_reset_callback = tegra_set_device_reset_callback;
++   if (context->gpu->get_device_reset_status)
++      context->base.get_device_reset_status = tegra_get_device_reset_status;
++   if (context->gpu->set_device_reset_callback)
++      context->base.set_device_reset_callback = tegra_set_device_reset_callback;
+    context->base.dump_debug_state = tegra_dump_debug_state;
+    context->base.emit_string_marker = tegra_emit_string_marker;

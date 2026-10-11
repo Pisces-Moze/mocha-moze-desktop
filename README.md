@@ -10,6 +10,10 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 
 桌面这条线要解决的是软件渲染与横屏旋转叠加之后的显示问题：默认 Nouveau 走硬件着色器，但扫描输出仍是 simpledrm，所以有额外的显存搬运开销。充电这条线要解决的是另一件事——插着线开机时用户只想看到电量和能安全地回到桌面，不需要拉起整套会话。
 
+## 最新开发进度（2026-10-11）
+
+原生 Tegra + Nouveau + WC Mesa 的受控窗口测试已达到约 60 FPS，完整桌面仍有偶发卡顿。同步修复、构建开关、探针和验证限制见 [NATIVE-PERFORMANCE.md](docs/NATIVE-PERFORMANCE.md)；跨仓库状态与远端任务见 [接续说明](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/HANDOFF-2026-10-11.md)。下面原 10 FPS/simpledrm 记录描述默认旧路径，不能作为本轮临时原生候选的状态。
+
 ## 现状
 
 | 项目 | 状态 |
