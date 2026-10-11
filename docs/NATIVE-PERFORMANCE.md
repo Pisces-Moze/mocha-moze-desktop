@@ -42,6 +42,8 @@ bash tools/build-native-probes.sh /path/to/artifacts/probes
 
 Cargo 对 vendored dependency 可能错误地复用 release 缓存，脚本清理 Smithay 的 **release** 包后重新构建。构建虚拟机中断后也要核对二进制；包含 `KMS explicit fence capability` 与 `MOCHA_FRAME` 只证明新代码编入，不证明实机成功。记录 SHA256、ELF Build ID 和实际 `/proc/PID/maps`。
 
+构建容器的 Debian 主源可按清华镜像文档配置；backports 使用同一镜像时，运行 `MOCHA_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian bash tools/install-build-deps.sh`。该选项只选择脚本写入的 backports URL，主源与安全源应在容器内另外配置。见 [TUNA Debian 配置说明](https://mirrors.tuna.tsinghua.edu.cn/help/debian/)。固定 vendor 的 Niri 构建仍使用 `--locked --offline`，无需在线重新解析依赖。
+
 ## 板上测试
 
 保持已验证的内核/模块、主线 Tegra 显示和独立候选库路径，先读取电源/温度。频率策略见 drivers 的 `gpu/README.md`。测试不能同时运行两个策略，也不要热卸载 Nouveau。
@@ -68,6 +70,8 @@ timeout 20s ./atomic-fence-scanout /dev/dri/cardTEGRA /dev/dri/renderDNOUVEAU
 
 第二次不要继承 `MOCHA_FENCE_CPU_WAIT`。两组都应有 pending exports，保存内核日志和屏幕观察。程序不进行 CPU 像素 map/readback/copy，但一次 KMS 成功不代表完整 Niri 通过。
 
+探针现在仅在 120 帧全部完成且至少一个导出 fence 在零超时 poll 时尚未完成的情况下输出 `ATOMIC_FENCE_PASS`。不足 120 帧、没有 pending exports 或 fence poll 错误均返回失败并走控制台恢复；不要把超时前的部分帧计数当作完整通过。
+
 完整原型机会话可使用 `performance/profile-installed-prototype.sh`，它依赖已安装候选目录、UID1000/mocha 和 niri.service，运行时替换并恢复用户服务。新 Niri 及新 Mesa 预先分别放 `/tmp/niri-native-fencing` 与 `/tmp/native-sync-stage`，保持后者 `lib/arm-linux-gnueabihf` 和 `dri` 布局；重启后 /tmp 消失，应重新准备。
 
 ```sh
@@ -75,6 +79,14 @@ MOCHA_PROFILE_NIRI=/tmp/niri-native-fencing MOCHA_PROFILE_BENCH_FRAMES=600 \
   sh performance/profile-installed-prototype.sh native-sync
 python3 performance/summarize-frame-profile.py /path/to/profile-native-sync.log
 ```
+
+脚本要求临时 `*-native` 内核、`mocha_native_performance=1` 和 connected/enabled DSI；在默认 simpledrm 系统上会在修改服务前拒绝运行。候选程序必须已可执行并带两种构建 marker。已有 `zzzz-frame-profile.conf` 会阻止测试，并用锁防止并发测试；成功、失败及 HUP/INT/TERM 都恢复原服务。SIGKILL/断电无法执行 shell 恢复，应在恢复连接后检查该 runtime override。停止运行后 `/run` 配置随重启消失。
+
+合成器和窗口基准使用同一个库环境；`native-sync` 均启用 `MOCHA_NATIVE_FENCE=1`，`baseline` 清除继承的开关。可通过 `MOCHA_NATIVE_SYNC_STAGE`、`MOCHA_PROFILE_BENCH` 指定预先校验的文件。会话以 systemd MainPID 的可执行文件及其对应的 Niri socket 为准，Wayland 名称从当前用户服务环境读取。输出最后的 `PROFILE_RESULTS` 指向独立结果目录，含二进制/候选 Gallium/DRI 哈希、实际 Niri maps、会话、capability、原始 journal、帧日志及可选窗口基准。不要把缺失的 profile/capability 记录当作成功。
+
+帧统计器拒绝缺字段、非有限/负数时间和缺失 `needs_sync` 的记录；P50/P95/P99 使用 nearest-rank，结果带算法名称。比较旧数据时应重新汇总原始日志，避免不同百分位算法的边界差异。
+
+验证脚本本身：`python3 tools/test-frame-profile.py` 检查日志完整性与统计；Linux 上运行 `python3 tools/test-installed-profile.py`，在隔离的 systemd/proc/sysfs 模拟环境检查两种库环境、含空格和单引号的路径、旧内核拒绝、已有配置保留、启动/基准失败、陈旧 socket 和 TERM 后恢复。这些回归不替代真实原生桌面验收。
 
 需要核对 `driver=tegra supports_fencing=true legacy=false`、合成帧的 `needs_sync=false` 与 wait_ms=0、真实候选 Gallium/EGL/GBM 映射、无同步/queue 错误，并比较 render/queue/total/P95/P99。仅 FPS 或 EGL 扩展名不够。debug/Profile 输出本身也有开销，随后关闭逐帧日志再做帧时间对照。
 

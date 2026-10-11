@@ -6,9 +6,11 @@ test "$EUID" = 0
 test "$ID" = debian && test "$VERSION_CODENAME" = trixie
 test "$(dpkg --print-architecture)" = amd64
 dpkg --add-architecture armhf
-cat > /etc/apt/sources.list.d/mocha-build-backports.sources <<'EOF'
+apt_mirror=${MOCHA_DEBIAN_MIRROR:-https://deb.debian.org/debian}
+[[ "$apt_mirror" =~ ^https?://[A-Za-z0-9./:_-]+$ ]] || { echo 'invalid Debian mirror URL' >&2; exit 2; }
+cat > /etc/apt/sources.list.d/mocha-build-backports.sources <<EOF
 Types: deb
-URIs: https://deb.debian.org/debian
+URIs: $apt_mirror
 Suites: trixie-backports
 Components: main
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg

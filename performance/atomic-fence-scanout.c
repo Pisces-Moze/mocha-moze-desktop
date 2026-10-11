@@ -190,11 +190,15 @@ int main(int argc, char **argv) {
         destroy_sync(display,sync);
         if(fence<0){fprintf(stderr,"export fence failed\n");goto done;}
         struct pollfd sync_poll={.fd=fence,.events=POLLIN};
-        if(poll(&sync_poll,1,0)==0) pending_exports++;
+        int ready=poll(&sync_poll,1,0);
+        if(ready<0 || (sync_poll.revents&(POLLERR|POLLHUP|POLLNVAL))) {
+            close(fence);fprintf(stderr,"exported fence poll failed\n");goto done;
+        }
+        if(ready==0) pending_exports++;
         if(cpu_wait && !(poll(&sync_poll,1,1000)==1 && (sync_poll.revents&POLLIN))) {
             close(fence);fprintf(stderr,"CPU fence wait timed out\n");goto done;
         }
-        if(glGetError()!=GL_NO_ERROR){fprintf(stderr,"GPU rendering failed\n");goto done;}
+        if(glGetError()!=GL_NO_ERROR){close(fence);fprintf(stderr,"GPU rendering failed\n");goto done;}
         drmModeAtomicReq *request=drmModeAtomicAlloc();
         if(!request){close(fence);goto done;}
         int a=drmModeAtomicAddProperty(request,plane_id,fb_prop,b->fb);
@@ -215,7 +219,10 @@ int main(int argc, char **argv) {
         frames++;
     }
     printf("NATIVE_GPU_SCANOUT_FRAMES=%d SECONDS=%.3f FPS=%.2f CPU_PIXEL_COPIES=0\n",frames,now()-start,frames/(now()-start));
-    printf("ATOMIC_FENCE_PASS frames=%d pending_exports=%d cpu_wait=%d\n",frames,pending_exports,cpu_wait);
+    if(frames!=120 || pending_exports==0) {
+        fprintf(stderr,"atomic fence test incomplete: frames=%d/120 pending_exports=%d\n",frames,pending_exports);
+        goto done;
+    }
     result=0;
 done:
     if(modeset && drmModeSetCrtc(kms,saved->crtc_id,saved->buffer_id,saved->x,saved->y,&connector_id,1,&saved->mode)){fprintf(stderr,"console restore failed: %s\n",strerror(errno));result=1;}
@@ -235,5 +242,7 @@ done:
     if(resources)drmModeFreeResources(resources);
     if(gpu>=0)close(gpu);
     if(kms>=0)close(kms);
+    if(result==0)
+        printf("ATOMIC_FENCE_PASS frames=%d pending_exports=%d cpu_wait=%d\n",frames,pending_exports,cpu_wait);
     return result;
 }
