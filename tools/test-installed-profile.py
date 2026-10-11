@@ -58,7 +58,9 @@ BENCH = r'''#!/bin/sh
 printf '%s\n' "$LD_LIBRARY_PATH" "$LIBGL_DRIVERS_PATH" "$GBM_BACKENDS_PATH" "${MOCHA_NATIVE_FENCE:-unset}" > "$TEST_ROOT/benchmark-env"
 test "$WAYLAND_DISPLAY" = wayland-7
 test "${TEST_FAIL:-}" != benchmark || exit 1
-echo 'FRAMES=600'
+if test "${TEST_FAIL:-}" = incomplete; then echo 'GPU=fixture'; exit 0; fi
+if test "${TEST_FAIL:-}" = short; then echo 'NATIVE_COLOR_FRAMES=120 WARMUP=120 SECONDS=2'; exit 0; fi
+echo "NATIVE_COLOR_FRAMES=$MOCHA_BENCH_FRAMES WARMUP=120 SECONDS=10 FPS=60 P50_MS=16.6 P95_MS=17 P99_MS=18 OVER_25MS=0"
 '''
 
 
@@ -171,6 +173,12 @@ class InstalledProfileTest(unittest.TestCase):
 
     def test_restore_on_benchmark_failure(self):
         self.run_case(fail='benchmark')
+
+    def test_refuse_success_without_complete_benchmark(self):
+        self.run_case(fail='incomplete')
+
+    def test_refuse_wrong_benchmark_frame_count(self):
+        self.run_case(fail='short')
 
     def test_refuse_stale_socket_and_restore(self):
         self.run_case(fail='stale')

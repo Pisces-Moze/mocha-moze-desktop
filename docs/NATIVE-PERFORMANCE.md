@@ -84,6 +84,8 @@ python3 performance/summarize-frame-profile.py /path/to/profile-native-sync.log
 
 合成器和窗口基准使用同一个库环境；`native-sync` 均启用 `MOCHA_NATIVE_FENCE=1`，`baseline` 清除继承的开关。可通过 `MOCHA_NATIVE_SYNC_STAGE`、`MOCHA_PROFILE_BENCH` 指定预先校验的文件。会话以 systemd MainPID 的可执行文件及其对应的 Niri socket 为准，Wayland 名称从当前用户服务环境读取。输出最后的 `PROFILE_RESULTS` 指向独立结果目录，含二进制/候选 Gallium/DRI 哈希、实际 Niri maps、会话、capability、原始 journal、帧日志及可选窗口基准。不要把缺失的 profile/capability 记录当作成功。
 
+窗口基准被提前关闭或 Wayland 连接断开时返回失败；会话脚本还要求唯一的 `NATIVE_COLOR_FRAMES` 结束记录与请求帧数一致。仅进程退出码为零、只有 GPU 信息或帧数不足均不能通过，失败后仍恢复原桌面。
+
 帧统计器拒绝缺字段、非有限/负数时间和缺失 `needs_sync` 的记录；P50/P95/P99 使用 nearest-rank，结果带算法名称。比较旧数据时应重新汇总原始日志，避免不同百分位算法的边界差异。
 
 验证脚本本身：`python3 tools/test-frame-profile.py` 检查日志完整性与统计；Linux 上运行 `python3 tools/test-installed-profile.py`，在隔离的 systemd/proc/sysfs 模拟环境检查两种库环境、含空格和单引号的路径、旧内核拒绝、已有配置保留、启动/基准失败、陈旧 socket 和 TERM 后恢复。这些回归不替代真实原生桌面验收。

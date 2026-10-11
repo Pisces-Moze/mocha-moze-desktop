@@ -27,7 +27,7 @@ static void top_config(void*d,struct xdg_toplevel*t,int32_t w,int32_t h,struct w
  (void)d;(void)t;(void)states;
  if(w>0&&h>0){width=w;height=h;if(window)wl_egl_window_resize(window,w,h,0,0);}
 }
-static void close_window(void*d,struct xdg_toplevel*t){(void)d;(void)t;exit(0);}
+static void close_window(void*d,struct xdg_toplevel*t){(void)d;(void)t;fprintf(stderr,"Benchmark closed before completion\n");exit(1);}
 static const struct xdg_toplevel_listener top_listener={.configure=top_config,.close=close_window};
 static double now(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec+t.tv_nsec*1e-9;}
 static int compare_time(const void*a,const void*b){double x=*(const double*)a,y=*(const double*)b;return (x>y)-(x<y);}
@@ -48,6 +48,7 @@ int main(int argc,char**argv){
  if(fullscreen)xdg_toplevel_set_fullscreen(top,NULL);
  wl_surface_commit(surface);
  while(!configured&&wl_display_dispatch(display)>=0){}
+ if(!configured){fprintf(stderr,"Display disconnected before configure\n");return 1;}
  window=wl_egl_window_create(surface,width,height);
  EGLDisplay ed=eglGetDisplay((EGLNativeDisplayType)display);
  EGLint major,minor;
@@ -73,7 +74,7 @@ int main(int argc,char**argv){
  for(int f=0;f<frames+warmup;f++){
    if(f==warmup)start=now();
    double frame_start=now();
-   wl_display_dispatch_pending(display);
+   if(wl_display_dispatch_pending(display)<0){fprintf(stderr,"Display disconnected during benchmark\n");return 1;}
    glViewport(0,0,width,height);
    glClearColor((f%120)/119.0f,0.15f,1.0f-(f%120)/119.0f,1.0f);
    glClear(GL_COLOR_BUFFER_BIT);

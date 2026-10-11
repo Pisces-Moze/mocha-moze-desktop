@@ -123,6 +123,7 @@ runuser -u mocha -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY="$wayland
 if test "$frames" -gt 0; then
     runuser -u mocha -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY="$wayland" MOCHA_BENCH_FRAMES="$frames" \
         sh -c 'set -eu; . "$1"; exec timeout 75s "$2"' sh "$work/library-env" "$bench_binary" > "$result/benchmark.log"
+    test "$(grep -c "^NATIVE_COLOR_FRAMES=$frames WARMUP=120 " "$result/benchmark.log" || true)" = 1 || fail 'benchmark did not report the requested complete frame count'
     cat "$result/benchmark.log"
 fi
 journalctl _UID=1000 _SYSTEMD_USER_UNIT=niri.service --since="$start" -o cat --no-pager > "$result/journal.log"
