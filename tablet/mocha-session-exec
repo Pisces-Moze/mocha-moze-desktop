@@ -1,0 +1,20 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Wait for the compositor's new socket after login or a service restart.
+set -eu
+attempt=0
+while [ "$attempt" -lt 100 ]; do
+    for socket in "$XDG_RUNTIME_DIR"/niri.*.sock; do
+        [ -S "$socket" ] || continue
+        name=${socket##*/}
+        pid=${name%.sock}; pid=${pid##*.}
+        kill -0 "$pid" 2>/dev/null || continue
+        export NIRI_SOCKET="$socket"
+        display=${name#niri.}; export WAYLAND_DISPLAY=${display%%.*}
+        exec "$@"
+    done
+    attempt=$((attempt + 1))
+    sleep 0.1
+done
+echo 'No live Niri session socket' >&2
+exit 1

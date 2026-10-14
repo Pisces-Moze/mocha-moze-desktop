@@ -1,0 +1,43 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+release=$(readlink -f /usr/local/libexec/mocha-tablet-current)
+case "${1:-}" in
+    msg|validate|completions|--help|-h|--version|-V)
+        exec "$release/niri" "$@" ;;
+esac
+unset SMITHAY_USE_LEGACY MOCHA_FRAME_PROFILE GTK_IM_MODULE
+export RUST_LOG=warn,niri=info
+export XMODIFIERS=@im=fcitx QT_IM_MODULE=fcitx SDL_IM_MODULE=fcitx
+export MOCHA_TOUCH_LOCK_KEYBOARD=1
+export PATH=$HOME/.local/bin:/usr/local/bin:/srv/mocha-data/codex-debian-desktop/local/bin:/usr/bin:/bin
+# The user manager may outlive an autologin session; use the current seat.
+session=$(loginctl show-seat seat0 -p ActiveSession --value 2>/dev/null || true)
+if [ -n "$session" ] && [ "$(loginctl show-session "$session" -p User --value)" = "$(id -u)" ]; then
+    export XDG_SESSION_ID=$session
+else
+    unset XDG_SESSION_ID
+fi
+case "$(uname -r)" in
+    *-native*)
+        export MOCHA_NATIVE_FENCE=1
+        export MESA_LOADER_DRIVER_OVERRIDE=tegra MESA_DRI_DRIVER_OVERRIDE=tegra
+        export LD_LIBRARY_PATH=$release/mesa/lib/arm-linux-gnueabihf
+        export LIBGL_DRIVERS_PATH=$release/mesa/dri
+        export GBM_BACKENDS_PATH=$release/mesa/lib/arm-linux-gnueabihf/gbm
+        config=$HOME/.config/niri/mocha-tablet.kdl
+        if [ -f "$HOME/.local/state/nyxuri/mocha-full-installed.json" ]; then
+            config=$HOME/.config/niri/config.kdl
+        fi
+        ;;
+    *)
+        unset MOCHA_NATIVE_FENCE MESA_LOADER_DRIVER_OVERRIDE MESA_DRI_DRIVER_OVERRIDE
+        export SMITHAY_USE_LEGACY=1
+        config=$HOME/.config/niri/mocha-tablet-legacy.kdl
+        ;;
+esac
+case "${1:-}" in
+    msg|validate|completions|--help|-h|--version|-V)
+        exec "$release/niri" "$@" ;;
+    *) exec "$release/niri" --config "$config" "$@" ;;
+esac

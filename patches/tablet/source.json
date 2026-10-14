@@ -1,0 +1,88 @@
+{
+  "upstream": "https://github.com/GGEZUS/niri-tablet",
+  "commit": "3460625cd090d73feb54d838a8b16ed39c8ae251",
+  "base": "niri v26.04",
+  "license": "GPL-3.0-only",
+  "patches": [
+    {
+      "path": "0001-feat-input-add-touchscreen-3-finger-swipe-gestures.patch",
+      "sha256": "e0a109606b17967f49c4568f9becdc719c98eec2bada0ce4644803fd44f57930"
+    },
+    {
+      "path": "0002-feat-config-add-touchscreen-swipe-gesture-configurat.patch",
+      "sha256": "6c7d0529a6fa0ad4aa366166d3696977c13abe7366b9183b9d6a792e11d1c584"
+    },
+    {
+      "path": "0003-docs-document-touchscreen-swipe-gestures.patch",
+      "sha256": "266282997148b480d3fe6e0f684c0b1737377c9a84283148b766c240913c4337"
+    },
+    {
+      "path": "0004-feat-input-touchscreen-tap-and-bottom-edge-swipe-ges.patch",
+      "sha256": "3d00a1bb2d341ff331ce39e771bae44aa0c4814e681251254fda779ffc9c06c5"
+    },
+    {
+      "path": "0005-feat-input-discrete-4-finger-vertical-swipe-gestures.patch",
+      "sha256": "bd36b499606c91f01c5ffd90260311a14d3036d53afbe1c3b6ae33a12fde3e01"
+    },
+    {
+      "path": "0006-fix-input-count-late-joining-fingers-and-fix-deadloc.patch",
+      "sha256": "b0bdaddd80ea8b9a907d359f7437027067f8249d5cd9330030a0095a40556ef3"
+    },
+    {
+      "path": "0007-test-config-refresh-the-parse-insta-snapshot-for-the.patch",
+      "sha256": "213662c339db16a3b0b96bcb128208d9c65874a8e03e20a804980b389121bc92"
+    },
+    {
+      "path": "0008-feat-ui-show-touch-points-compositor-rendered-touch-.patch",
+      "sha256": "81021e3f42794ae25a9a0fb901f77269786935eadbf27dd56f9e1242c90553e2"
+    },
+    {
+      "path": "0009-feat-input-hold-swipe-touchscreen-gestures-move-wind.patch",
+      "sha256": "2c9f1800c6ee3ea33cab29bfd46000bcf2c4f74187159841005e139718ec891f"
+    },
+    {
+      "path": "0010-fix-input-own-multi-finger-touch-sequences-gestures-.patch",
+      "sha256": "e9ff2b560d19fab5c1186fd045bd59f988e377fbf00205f67fc7497639cd0889"
+    },
+    {
+      "path": "0011-fix-input-latch-gesture-ownership-through-smithay-s-.patch",
+      "sha256": "59fb1b5b1ac7c849f3f49dfa48090bc57105c0572d695b3c78e7ac8fd4d9cd47"
+    },
+    {
+      "path": "0012-fix-input-clear-touch-gesture-state-when-a-touch-dev.patch",
+      "sha256": "894e67039b1cc379eab94f1d4caefc990a31805fa0643b8dbe9e03abc9275635"
+    },
+    {
+      "path": "0013-feat-input-gesture-debug-logging-behind-gestures-deb.patch",
+      "sha256": "ba952e3768914c519fcfaffe7ab2f4d92debe44bc6ab858212617bee60bd423b"
+    },
+    {
+      "path": "0014-feat-input-single-finger-edge-and-corner-swipe-gestu.patch",
+      "sha256": "70d70499b8dc04118c0638576f6cf7eb0171acb29c73ce3c9a4f0b4f33225f70"
+    },
+    {
+      "path": "0015-docs-document-touchscreen-edge-and-corner-swipe-gest.patch",
+      "sha256": "c128588cb43f2d9a2e5d96778e9abc092341bc30f2d0f76f59c0073e613ccb8c"
+    },
+    {
+      "path": "0016-fix-test-edge-swipe-test-helper-rectangle-constructi.patch",
+      "sha256": "df71a7e5c10da1c2191f28e5f6558043529a911656d2824b6c97877f3241d4b3"
+    },
+    {
+      "path": "0017-feat-input-horizontal-swipe-column-resize-mode.patch",
+      "sha256": "676c6f7847612d0b3d304fe9bc81bfe21c914896cc6fad24a5e1af84f4ce5d1a"
+    },
+    {
+      "path": "0018-docs-document-the-touchscreen-swipe-action-options.patch",
+      "sha256": "ac92687df3e3e8bc4b86451159f40b11b967febbcbc842706a65f1728440d3fc"
+    },
+    {
+      "path": "0019-feat-gestures-derive-the-tap-flick-tier-from-fingers.patch",
+      "sha256": "31db31426ba08566862a3900f0c62a258cb51a7fc169c6e4e456690d2117f43a"
+    },
+    {
+      "path": "0020-feat-gestures-swipe-more-left-right-for-extra-finger.patch",
+      "sha256": "22d206b430c33fadedd63583e624bc712e2a0d1daa867894e2516e8ae4e3912b"
+    }
+  ]
+}

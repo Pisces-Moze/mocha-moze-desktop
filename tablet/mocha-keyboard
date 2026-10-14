@@ -1,0 +1,9 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Manual application: the service is deliberately not enabled at login.
+set -eu
+if systemctl --user is-active --quiet mocha-keyboard.service; then
+    systemctl --user kill --signal=SIGRTMIN mocha-keyboard.service
+else
+    systemctl --user start mocha-keyboard.service
+fi

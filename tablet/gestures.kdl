@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Requires the pinned v26.04 tablet patch series. Ordinary one/two-finger
+// touches reach applications; recognized gestures cancel client touches.
+gestures {
+    hot-corners { off; }
+    touchscreen-swipe {
+        fingers 3
+        horizontal-swipe "move-view"
+        tap { maximize-column; }
+        tap-more { toggle-overview; }
+        swipe-more-up { fullscreen-window; }
+        swipe-more-down { close-window; }
+        hold {
+            left { move-column-left; }
+            right { move-column-right; }
+            up { move-window-to-workspace-up; }
+            down { move-window-to-workspace-down; }
+        }
+    }
+    touchscreen-edge-swipe {
+        bottom { toggle-overview; }
+        top { spawn "/usr/local/bin/noctalia" "msg" "panel-toggle" "control-center"; }
+        left { focus-column-left; }
+        right { focus-column-right; }
+    }
+    touchscreen-corner-swipe {
+        top-right { fullscreen-window; }
+        bottom-right { spawn "/usr/local/bin/mocha-keyboard"; }
+        bottom-left { spawn "/usr/local/bin/noctalia" "msg" "panel-toggle" "launcher"; }
+    }
+}

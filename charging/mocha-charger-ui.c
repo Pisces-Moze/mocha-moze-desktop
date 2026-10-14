@@ -6,6 +6,7 @@
 #include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/kd.h>
+#include <linux/vt.h>
 #include <math.h>
 #include <poll.h>
 #include <signal.h>
@@ -26,6 +27,7 @@
 #define H 520
 static volatile sig_atomic_t stop;
 static bool net_charging=true;
+static bool rotate270;
 static void interrupted(int signal_number) { (void)signal_number;stop=1; }
 static double now(void) { struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec+t.tv_nsec/1e9; }
 static int read_int(const char *path, int fallback) { FILE *f=fopen(path,"r");int n=fallback;if(f){if(fscanf(f,"%d",&n)!=1)n=fallback;fclose(f);}return n; }
@@ -91,6 +93,14 @@ static uint8_t *pack(const struct fb_var_screeninfo *v,cairo_surface_t *surface,
 }
 static void present(uint8_t *fb,const struct fb_fix_screeninfo *fix,const struct fb_var_screeninfo *v,const uint8_t *packed) {
  unsigned bytes=v->bits_per_pixel/8;int px=((int)v->xres-W)/2,py=((int)v->yres-H)/2;
+ if(rotate270){
+  int ox=((int)v->xres-H)/2,oy=((int)v->yres-W)/2;
+  for(int y=0;y<H;y++)for(int x=0;x<W;x++){
+   size_t offset=(size_t)(oy+W-1-x+v->yoffset)*fix->line_length+(ox+y+v->xoffset)*bytes;
+   if(offset+bytes<=fix->smem_len)memcpy(fb+offset,packed+((size_t)y*W+x)*bytes,bytes);
+  }
+  return;
+ }
  for(int row=0;row<H;row++){
   size_t offset=(size_t)(py+row+v->yoffset)*fix->line_length+(px+v->xoffset)*bytes;
   if(offset+(size_t)W*bytes<=fix->smem_len)memcpy(fb+offset,packed+(size_t)row*W*bytes,W*bytes);
@@ -103,6 +113,7 @@ static void hold_progress(uint8_t *fb,const struct fb_fix_screeninfo *fix,const 
   if(progress<0)level=0;
   uint32_t pixel=channel(level,v->red)|channel(level,v->green)|channel(level,v->blue)|channel(255,v->transp);
   int px=ox+x,py=oy+y;
+  if(rotate270){px=((int)v->xres-H)/2+y;py=((int)v->yres-W)/2+W-1-x;}
   size_t offset=(size_t)(py+v->yoffset)*fix->line_length+(px+v->xoffset)*bytes;
   if(offset+bytes<=fix->smem_len)memcpy(fb+offset,&pixel,bytes);
  }
@@ -128,16 +139,17 @@ int main(int argc,char **argv) {
   cairo_surface_t *s=render(67,true,.5);int code=cairo_surface_write_to_png(s,argv[2]);cairo_surface_destroy(s);return code!=CAIRO_STATUS_SUCCESS;
  }
  bool preview=argc==2&&!strcmp(argv[1],"--preview"),live=argc==2&&!strcmp(argv[1],"--live");
+ rotate270=getenv("MOCHA_CHARGER_TRANSFORM")&&!strcmp(getenv("MOCHA_CHARGER_TRANSFORM"),"270");
  bool reduced=getenv("MOCHA_REDUCED_MOTION")&&!strcmp(getenv("MOCHA_REDUCED_MOTION"),"1");
  if(!preview&&!live){fprintf(stderr,"usage: %s --snapshot FILE | --preview | --live\n",argv[0]);return 2;}
  int fbfd=open("/dev/fb0",O_RDWR|O_CLOEXEC);struct fb_fix_screeninfo fix;struct fb_var_screeninfo v;
  if(fbfd<0||ioctl(fbfd,FBIOGET_FSCREENINFO,&fix)||ioctl(fbfd,FBIOGET_VSCREENINFO,&v)){perror("framebuffer");return 2;}
- if((v.bits_per_pixel!=16&&v.bits_per_pixel!=32)||v.xres<W||v.yres<H){fprintf(stderr,"unsupported framebuffer\n");return 2;}
+ if((v.bits_per_pixel!=16&&v.bits_per_pixel!=32)||v.xres<(rotate270?H:W)||v.yres<(rotate270?W:H)){fprintf(stderr,"unsupported framebuffer\n");return 2;}
  uint8_t *fb=mmap(NULL,fix.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,fbfd,0);
  if(fb==MAP_FAILED){perror("framebuffer map");return 2;}
  uint8_t *saved=NULL;if(preview){saved=malloc(fix.smem_len);if(!saved)return 2;memcpy(saved,fb,fix.smem_len);}
  int tty=open("/dev/tty1",O_RDWR|O_CLOEXEC);int old_mode=KD_TEXT;
- if(tty>=0){ioctl(tty,KDGETMODE,&old_mode);ioctl(tty,KDSETMODE,KD_GRAPHICS);}
+ if(tty>=0){ioctl(tty,KDGETMODE,&old_mode);ioctl(tty,KDSETMODE,KD_TEXT);ioctl(tty,VT_ACTIVATE,1);ioctl(tty,VT_WAITACTIVE,1);ioctl(fbfd,FBIOBLANK,FB_BLANK_UNBLANK);ioctl(tty,KDSETMODE,KD_GRAPHICS);}
  const char *charger="/sys/class/power_supply/bq24190-charger/online";
  const char *capacity="/sys/class/power_supply/bq27520g4-0/capacity";
  glob_t backlights={0};glob("/sys/class/backlight/mocha-miui-backlight/brightness",0,NULL,&backlights);

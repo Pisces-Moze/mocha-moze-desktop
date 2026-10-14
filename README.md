@@ -10,7 +10,9 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 
 桌面这条线要解决的是软件渲染与横屏旋转叠加之后的显示问题：默认 Nouveau 走硬件着色器，但扫描输出仍是 simpledrm，所以有额外的显存搬运开销。充电这条线要解决的是另一件事——插着线开机时用户只想看到电量和能安全地回到桌面，不需要拉起整套会话。
 
-## 最新开发进度（2026-10-11）
+## 最新开发进度（2026-10-13）
+
+实机默认已切换到验证过的原生内核，正常开机、旋转后的桌面／触屏、中文输入与密码解锁已验收。完整 Nyxuri 配置和默认插件已部署；新增触屏手势、实体导航键、按键背光、手动键盘及参数设置，见 [实机触屏与 Nyxuri](docs/TABLET-NYXURI.md)。Noctalia ARM 插件初始化的内存对齐修复通过了 1,000 次真实 Luau 状态回归。下文 simpledrm／10 FPS 表述属于历史路径。
 
 原生 Tegra + Nouveau + WC Mesa 的受控窗口测试已达到约 60 FPS，完整桌面仍有偶发卡顿。同步修复、构建开关、探针和验证限制见 [NATIVE-PERFORMANCE.md](docs/NATIVE-PERFORMANCE.md)；跨仓库状态与远端任务见 [接续说明](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/HANDOFF-2026-10-11.md)。下面原 10 FPS/simpledrm 记录描述默认旧路径，不能作为本轮临时原生候选的状态。
 
@@ -18,12 +20,12 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 
 | 项目 | 状态 |
 | --- | --- |
-| 横屏桌面（Niri + Noctalia + Firefox ESR） | 可运行，动画约 10 FPS |
+| 横屏桌面（Niri + Noctalia + Firefox ESR） | 原生桌面及完整 Nyxuri 效果已实机运行；完整桌面帧率待持续测量 |
 | 横屏旋转 damage | 已用 0003 修复黑条与残影 |
-| native Tegra + Nouveau 输出 | 约 29.8 FPS；已有 Mesa 空回调修复候选与回归测试，原生桌面实机验收待完成，未默认启用 |
+| native Tegra + Nouveau 输出 | 已默认使用，GPU／Niri 显示正常；WC 与 native-sync 修复已持久安装 |
 | 视频播放 | 软件 H.264 / Firefox 已验证 |
 | 硬件编解码 | 未完成 |
-| 最小充电模式 | 可用，与桌面互斥切换 |
+| 最小充电模式 | 充电界面与切换代码可用，关机插线冷启动验收待完成 |
 | 音频硬件 | 无完整 RT5671 声卡，PipeWire 只证明服务在跑 |
 
 ## 上游固定版本

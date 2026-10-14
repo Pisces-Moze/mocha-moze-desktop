@@ -1,0 +1,10 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+systemctl --user start mocha-input-method.service
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    state=$(/usr/bin/fcitx5-remote 2>/dev/null || true)
+    case "$state" in 1|2) break ;; esac
+    sleep 0.2
+done
+exec /usr/bin/fcitx5-remote -t

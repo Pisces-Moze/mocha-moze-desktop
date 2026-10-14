@@ -22,6 +22,19 @@ fi
 if [ "${MOCHA_FRAME_PROFILE_BUILD:-0}" = 1 ]; then
  apply_patch "$src" "$repo/patches/0011-niri-frame-profile.patch"
 fi
+if [ "${MOCHA_TABLET_GESTURES:-0}" = 1 ]; then
+ # Verify the upstream-authored, GPL-3.0 tablet patches before applying in order.
+ python3 - "$repo/patches/tablet" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+for entry in json.loads((p / 'source.json').read_text())['patches']:
+    assert hashlib.sha256((p / entry['path']).read_bytes()).hexdigest() == entry['sha256'], entry['path']
+PY
+ for patch_file in "$repo"/patches/tablet/*.patch; do
+  apply_patch "$src" "$patch_file"
+ done
+fi
 python3 - "$src/vendor/smithay" <<'PY'
 import sys,json,hashlib
 from pathlib import Path

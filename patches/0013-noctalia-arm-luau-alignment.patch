@@ -1,0 +1,38 @@
+From: Mocha maintainers
+Subject: [PATCH] scripting: preserve Luau 16-byte alignment on 32-bit ARM
+
+ARM glibc malloc/realloc only promise 8-byte alignment. Luau's aligned
+global_State initialization generates NEON stores with a 128-bit alignment
+hint, making plugin startup fail intermittently with SIGBUS. Allocate/copy/free
+on ARM instead; keep the old block and accounting intact on allocation failure.
+Other architectures retain the existing realloc path.
+
+--- a/src/scripting/luau_host.cpp
++++ b/src/scripting/luau_host.cpp
+@@ -36,6 +36,7 @@
+ #include <chrono>
+ #include <cmath>
+ #include <cstdint>
++#include <cstring>
+ #include <cstdlib>
+ #include <ctime>
+ #include <filesystem>
+@@ -1850,7 +1851,18 @@ void* LuauHost::allocate(void* ud, void* ptr, std::size_t osize, std::size_t nsize) {
+   if (host != nullptr && nsize > osize && host->m_memUsed + (nsize - osize) > kMemoryCeilingBytes) {
+     return nullptr; // refuse growth past the ceiling -> catchable LUA_ERRMEM
+   }
++#if defined(__arm__) && defined(__linux__)
++  void* result = nullptr;
++  if (posix_memalign(&result, 16, nsize) != 0) {
++    return nullptr; // old block and accounting remain intact
++  }
++  if (ptr != nullptr) {
++    std::memcpy(result, ptr, std::min(osize, nsize));
++    std::free(ptr);
++  }
++#else
+   void* result = std::realloc(ptr, nsize);
++#endif
+   if (result == nullptr) {
+     return nullptr; // realloc failed; old block intact, accounting unchanged
+   }

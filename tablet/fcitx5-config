@@ -1,0 +1,4 @@
+[Behavior]
+ActiveByDefault=False
+ShareInputState=All
+AllowInputMethodForPassword=False

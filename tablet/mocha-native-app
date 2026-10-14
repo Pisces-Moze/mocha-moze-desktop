@@ -1,0 +1,22 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# systemd application scopes do not inherit every compositor environment
+# variable. Select the matched EGL/DRI pair explicitly for native applications.
+set -eu
+release=$(readlink -f /usr/local/libexec/mocha-tablet-current)
+case "$(uname -r)" in
+    *-native*)
+        export MOCHA_NATIVE_FENCE=1
+        export MOCHA_DOCK_LINEAR_ICONS=1
+        export MESA_LOADER_DRIVER_OVERRIDE=tegra MESA_DRI_DRIVER_OVERRIDE=tegra
+        export LD_LIBRARY_PATH=$release/mesa/lib/arm-linux-gnueabihf
+        export LIBGL_DRIVERS_PATH=$release/mesa/dri
+        export GBM_BACKENDS_PATH=$release/mesa/lib/arm-linux-gnueabihf/gbm
+        ;;
+esac
+export PATH=$HOME/.local/bin:/usr/local/bin:/srv/mocha-data/codex-debian-desktop/local/bin:/usr/bin:/bin
+session=$(loginctl show-seat seat0 -p ActiveSession --value 2>/dev/null || true)
+if [ -n "$session" ] && [ "$(loginctl show-session "$session" -p User --value)" = "$(id -u)" ]; then
+    export XDG_SESSION_ID=$session
+fi
+exec "$@"

@@ -1,0 +1,16 @@
+[Unit]
+Description=Nyxuri Noctalia desktop shell on the Mocha native renderer
+After=niri.service
+PartOf=niri.service graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=6
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/mocha-session-exec /usr/local/bin/noctalia
+Restart=on-failure
+RestartSec=2
+LimitCORE=0
+
+[Install]
+WantedBy=graphical-session.target

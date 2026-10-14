@@ -15,8 +15,8 @@ def main():
         return
     once = Path('/boot/mocha-desktop.once')
     desktop_once = once.exists()
-    if desktop_once:
-        once.unlink()
+    # Generators run with the system filesystem read-only. Consume this marker
+    # in a normal boot service; writing /boot here made the entire generator fail.
     try:
         online = Path('/sys/class/power_supply/bq24190-charger/online').read_text().strip() == '1'
     except OSError:

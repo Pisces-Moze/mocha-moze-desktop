@@ -1,0 +1,9 @@
+[Unit]
+Description=Mocha touch keyboard (opened manually)
+PartOf=graphical-session.target niri.service
+After=niri.service
+
+[Service]
+ExecStart=/usr/local/libexec/mocha-session-exec /usr/local/libexec/mocha-touch-keyboard.py
+Restart=on-failure
+RestartSec=2
