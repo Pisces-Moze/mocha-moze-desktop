@@ -1,0 +1,21 @@
+From: Mocha maintainers
+Subject: [PATCH] tegra: consume sampler reserve only for ownership transfers
+
+--- a/src/gallium/drivers/tegra/tegra_context.c
++++ b/src/gallium/drivers/tegra/tegra_context.c
+@@ -571,9 +571,13 @@
+    unsigned i;
+ 
+    for (i = 0; i < num_views; i++) {
+-      /* adjust private reference count */
++      /* Only an ownership transfer consumes a private GPU reference.
++       * Borrowed bindings retain/release their own references in the GPU
++       * driver; decrementing our reserve for them leaks sampler views and
++       * their textures when the wrapper is destroyed.
++       */
+       view = to_tegra_sampler_view(pviews[i]);
+-      if (view) {
++      if (view && take_ownership) {
+          view->refcount--;
+          if (!view->refcount) {
+             view->refcount = 100000000;

@@ -1,5 +1,7 @@
 # 原生显示性能候选与复现（2026-10-11）
 
+2026-10-13 更新：验证过的原生内核和桌面已持久安装，正常开机由维护者确认。触屏、完整 Nyxuri 和 Noctalia ARM 对齐修复见 [TABLET-NYXURI.md](TABLET-NYXURI.md)。本文其余部分保留候选阶段的对照数据，不代表完整 Nyxuri 桌面的实时性能。
+
 完整设备状态、未完成问题和跨仓库锁定见 [远端交接](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/HANDOFF-2026-10-11.md)。本分支是候选源码，不自动安装或替换默认引导。
 
 ## 补丁顺序与用途
@@ -15,6 +17,13 @@
 | 0009 | Smithay Tegra explicit fence 检测 | 按驱动名而非厂商描述识别闭源 NVIDIA；全新 release 构建与有限原生桌面 profile 已验证 |
 | 0010 | Noctalia 可选 EGL robustness 开关 | 默认保持原逻辑；环境变量 `NOCTALIA_DISABLE_EGL_ROBUSTNESS=1` 才禁用 |
 | 0011 | Niri frame profile | 可选插桩，`MOCHA_FRAME_PROFILE=1` 才打印帧记录 |
+| 0014 | Noctalia Dock 图标线性采样 | 仅原生 GK20A 的图标兼容路径；实机截图与用户确认通过 |
+| 0015 | Mesa Tegra scanout GEM 生命周期 | 重复 PRIME 句柄引用计数、最后释放时关闭一次；真实 384 次创建销毁与概览循环通过 |
+| 0016/0017 | Mesa Tegra sampler 所有权 | 借用绑定不消耗 reserve；转交绑定在 GPU 接管后释放外层引用；真实离屏采样与控制中心循环通过 |
+
+0015 的依据是 [Linux DRM 用户接口](https://www.kernel.org/doc/html/latest/gpu/drm-uapi.html#drm-ioctl-prime-fd-to-handle)：重复 PRIME 导入可返回同一 GEM 句柄，内核不为用户句柄重复导入计数。修复在同一锁中完成导入与引用跟踪，并只在最后一次释放时关闭。`tools/test-mesa-scanout-lifetime.py` 编译实际补丁函数，覆盖共享／独立／失败路径和 8 线程并发；`tools/native-scanout-lifetime.c` 在真实 Tegra 节点创建销毁 GBM scanout BO，不执行 modeset 或写 framebuffer。旧库每 128 次积累约 8 MiB，新库累计 384 次不增长；桌面实际加载修复库后可用内存约 1.2 GiB，20 轮概览开关后图形缓冲保持约 40.5 MiB。长期多应用仍需观察。
+
+0016/0017 补齐 sampler 的两层所有权：借用绑定不消耗 GPU reserve；转交绑定先让 GPU 接管，再释放调用者交出的 wrapper 引用。先前只修 reserve 的候选仍在 20 轮控制中心开关中从 14 个、42,504,192 字节增至 98 个、313,954,304 字节，不能算完整修复。真实离屏 EGL 图像导入／采样对照每批 128 次留下 8 MiB；完整修复累计 384 次只保留当前绑定的 1 个 64 KiB 缓冲，销毁 context 后恢复原计数。最终 Gallium SHA256 `cc81fe6399af38442a48aa52801400086dcb43008aae292353ebac4d65c57fbe` 已持久安装并核对 Niri/Noctalia maps；20 轮概览和 20 轮控制中心开关及随后空闲均保持 7 个缓冲、39,735,296 字节，可用内存约 1.2 GiB。该有限测试不能替代长期多应用检查。
 
 0007 的 `NOUVEAU_BO_COHERENT` 在该非一致性 SoC 上选择 write-combined 映射，减少每次提交全页 cache maintenance。不是把所有 CPU 映射都变成 cached，也不改变 firmware/电压表。现有公开 WC 补丁与实测源码的三个文件逐字节核对。
 
@@ -27,7 +36,7 @@
 按 README 准备固定 Niri/Smithay vendored 源码和 Mesa 25.0.7。不同测试组合使用独立源码树，避免已应用实验补丁残留污染对照；环境变量是请求应用补丁，不会自动撤回旧源码补丁。
 
 ```sh
-# WC 对照：0004..0007，独立输出目录，不安装系统库。
+# WC 对照：0004..0007 + 0015..0017，独立输出目录，不安装系统库。
 bash tools/build-mesa.sh /path/to/mesa-baseline /path/to/artifacts/mesa-wc
 
 # 输出 native-sync 候选：增加 0008；运行还需要 MOCHA_NATIVE_FENCE=1。

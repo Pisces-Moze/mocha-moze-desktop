@@ -1,0 +1,22 @@
+From: Mocha maintainers
+Subject: [PATCH] tegra: consume transferred sampler wrapper references
+
+--- a/src/gallium/drivers/tegra/tegra_context.c
++++ b/src/gallium/drivers/tegra/tegra_context.c
+@@ -591,6 +591,16 @@
+    context->gpu->set_sampler_views(context->gpu, shader, start_slot,
+                                    num_views, unbind_num_trailing_slots,
+                                    take_ownership, views);
++
++   /* The GPU binding owns the unwrapped view. Consume the caller's wrapper
++    * reference too, after the GPU has retained its binding reference.
++    */
++   if (take_ownership) {
++      for (i = 0; i < num_views; i++) {
++         struct pipe_sampler_view *wrapper = pviews[i];
++         pipe_sampler_view_reference(&wrapper, NULL);
++      }
++   }
+ }
+ 
+ static void
