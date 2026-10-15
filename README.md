@@ -1,6 +1,6 @@
 # Mocha Moze Desktop
 
-> 为跑 Debian armhf 的小米平板 1 提供两条图形界面：横屏 Niri 桌面，以及只在充电时启动的竖屏电量界面。
+> 为跑 Debian armhf 的小米平板 1 提供横屏 Niri 桌面，以及与桌面方向一致的最小充电界面。
 
 [![License: GPL-2.0-only](https://img.shields.io/badge/License-GPL--2.0--only-blue.svg)](LICENSE)
 
@@ -25,7 +25,7 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 | native Tegra + Nouveau 输出 | 已默认使用，GPU／Niri 显示正常；WC 与 native-sync 修复已持久安装 |
 | 视频播放 | 软件 H.264 / Firefox 已验证 |
 | 硬件编解码 | 未完成 |
-| 最小充电模式 | 充电界面与切换代码可用，关机插线冷启动验收待完成 |
+| 最小充电模式 | 旋转、短暂拔插线唤醒、长按进入桌面已在本机确认；U-Boot 提前采样配套后插电按住冷启动直接进桌面 |
 | 音频硬件 | 无完整 RT5671 声卡，PipeWire 只证明服务在跑 |
 
 ## 上游固定版本
@@ -181,6 +181,10 @@ sudo bash tools/install-session.sh mocha
 
 ## 最小充电模式
 
+2026-10-16 本机已经持久安装并确认：充电动画方向与桌面一致，自动熄屏后拔线约 2–3 秒再插回可重新亮屏，长按电源可进入桌面；配套 U-Boot 提前采样后，普通插电按住启动直接进入桌面。它仍是最小 Linux 充电环境，不控制原厂前级引导器的短按开机行为。完整证据见 [实机记录](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/DIAGNOSTICS-2026-10-16.md)。
+
+`/etc/default/mocha-charger` 的 `MOCHA_CHARGER_TRANSFORM=90` 对应当前 Niri 的 270° 输出变换。安装器仅在配置不存在时写入该默认值，保留用户已有设置；UI 支持 0/90/180/270。
+
 主机侧编译充电 UI（Cairo 直接画 framebuffer，无需 GPU）：
 
 ```sh
@@ -203,7 +207,7 @@ sudo touch /boot/mocha-charger.enabled
 
 ### 启动与切换
 
-generator 在开机时读取 `/proc/cmdline`，条件是 `/boot/mocha-charger.enabled` 存在、充电器 `online` 为 1、`/boot/mocha-desktop.once` 不存在、命令行里没有 `systemd.unit=` 也没有 `mocha_native_debug4=1`。四个条件同时成立时，它在 early 目录里把 `default.target` 软链到 `mocha-charger.target`，于是桌面不启动。若存在 `/boot/mocha-desktop.once`，generator 会把它删掉并放行桌面一次。
+generator 在开机时读取 `/proc/cmdline`，条件是 `/boot/mocha-charger.enabled` 存在、充电器 `online` 为 1、`/boot/mocha-desktop.once` 不存在、命令行里没有 `systemd.unit=` 也没有 `mocha_native_debug4=1`。它还检查 U-Boot 的 `mocha_desktop_requested=1` 与 gpio-keys 当前按住状态，电量至少 5% 才接受桌面请求。满足充电条件且没有桌面请求时，在 early 目录把 `default.target` 软链到 `mocha-charger.target`。generator 不写 `/boot`；一次性标记由正常服务消费。
 
 `mocha-charger.target` 是 `AllowIsolate=yes` 的目标，依赖 `basic.target`、`local-fs.target`。`mocha-charger.service` 与 `getty@tty1.service`、`user@1000.service` 冲突，启动前 `loginctl terminate-user mocha`，再 `modprobe mocha_miui_backlight`，最后用 `systemd-inhibit --what=handle-power-key --mode=block` 包住 `mocha-charger-session`——这样充电界面处理电源键时，logind 不会再抢着关机或重启。
 
@@ -216,7 +220,7 @@ generator 在开机时读取 `/proc/cmdline`，条件是 `/boot/mocha-charger.en
 | 长按回桌面 | 持续按住 2 秒，且电量计读数 ≥ 5% |
 | 拔线关机 | 检测到离线超过 8 秒 |
 
-UI 用 `cairo_image_surface` 在内存里画 720×520 的电池图形，按 framebuffer 的 `red/green/blue/transp` 位域打包成 16 位或 32 位像素，只把居中这块区域复制到 `/dev/fb0`。入场、脉冲、退场三组动画帧在电量或在线状态变化时一次性预打包，主循环按 1/60 秒的节拍挑一帧贴上去，按住电源键时另外单独刷新底部那 192×4 像素的进度条。framebuffer 少于 16 位或分辨率小于 720×520 会直接以退出码 2 结束。运行期间把 tty1 切到 `KD_GRAPHICS`，退出时恢复原模式。三个可执行模式是 `--snapshot FILE`（导出一张 PNG，固定 67% 且在线）、`--preview`（跑 8 秒后还原屏幕原内容）、`--live`（正式模式）。设 `MOCHA_REDUCED_MOTION=1` 会关掉呼吸与缩放动画。
+UI 用 `cairo_image_surface` 在内存里画 720×520 的电池图形，按 framebuffer 的 `red/green/blue/transp` 位域打包成 16 位或 32 位像素，只复制居中区域到 `/dev/fb0`。先显示基础帧，主循环每轮至多准备一张入场／脉冲／退场帧，使用预计算采样和通道表，避免整套缓存阻塞线缆轮询；按住电源时刷新同方向的进度条。横向变换会交换所需宽高，格式和尺寸不支持时退出。短暂拔插会唤醒并重置 15 秒显示计时；启动时也快照读取已按住的物理电源键。运行期间把 tty1 切到 `KD_GRAPHICS`，退出恢复原模式。三个模式是 `--snapshot FILE`（导出 PNG，固定 67% 且在线）、`--preview`（跑 8 秒后还原屏幕）、`--live`（正式模式）。`MOCHA_REDUCED_MOTION=1` 关闭呼吸与缩放动画。
 
 ### BC1.2 输入限流
 

@@ -2,7 +2,10 @@
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 test "$(uname -m)" = armv7l; test "$EUID" = 0
-install -d /usr/local/libexec /etc/systemd/system /etc/systemd/system-generators
+install -d /usr/local/libexec /etc/systemd/system /etc/systemd/system-generators /etc/default
+if [ ! -e /etc/default/mocha-charger ];then
+ install -m644 "$repo/charging/mocha-charger.default" /etc/default/mocha-charger
+fi
 install -m755 "$repo/build/mocha-charger-ui" /usr/local/libexec/
 for n in mocha-charge-detect.py mocha-charge-policy.py mocha-charger-session;do install -m755 "$repo/charging/$n" /usr/local/libexec/;done
 install -m755 "$repo/charging/mocha-charger-generator" /etc/systemd/system-generators/
