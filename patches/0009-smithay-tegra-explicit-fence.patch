@@ -1,0 +1,54 @@
+--- a/src/backend/drm/compositor/mod.rs
++++ b/src/backend/drm/compositor/mod.rs
+@@ -1182,12 +1182,10 @@
+         })?;
+         // `IN_FENCE_FD` makes commit fail on Nvidia driver
+         // https://github.com/NVIDIA/open-gpu-kernel-modules/issues/622
+-        let is_nvidia = driver.name().to_string_lossy().to_lowercase().contains("nvidia")
+-            || driver
+-                .description()
+-                .to_string_lossy()
+-                .to_lowercase()
+-                .contains("nvidia");
++        // Match the DRM driver, not its vendor: "NVIDIA Tegra graphics"
++        // belongs to mainline tegra and supports IN_FENCE_FD independently.
++        let driver_name = driver.name().to_string_lossy().to_lowercase();
++        let is_nvidia = matches!(driver_name.as_str(), "nvidia" | "nvidia-drm" | "nvidia_drm");
+ 
+         let cursor_size = Size::from((cursor_size.w as i32, cursor_size.h as i32));
+         let damage_tracker = OutputDamageTracker::from_mode_source(output_mode_source.clone());
+@@ -1204,6 +1202,8 @@
+                 })?
+             && plane_has_property(&*surface, surface.plane(), "IN_FENCE_FD")?
+             && !(is_nvidia && nvidia_drm_version().unwrap_or((0, 0, 0)) < (560, 35, 3));
++        debug!(driver = %driver_name, supports_fencing, legacy = surface.is_legacy(),
++               "KMS explicit fence capability");
+ 
+         for format in color_formats {
+             debug!("Testing color format: {}", format);
+@@ -1365,12 +1365,10 @@
+         })?;
+         // `IN_FENCE_FD` makes commit fail on Nvidia driver
+         // https://github.com/NVIDIA/open-gpu-kernel-modules/issues/622
+-        let is_nvidia = driver.name().to_string_lossy().to_lowercase().contains("nvidia")
+-            || driver
+-                .description()
+-                .to_string_lossy()
+-                .to_lowercase()
+-                .contains("nvidia");
++        // Match the DRM driver, not its vendor: "NVIDIA Tegra graphics"
++        // belongs to mainline tegra and supports IN_FENCE_FD independently.
++        let driver_name = driver.name().to_string_lossy().to_lowercase();
++        let is_nvidia = matches!(driver_name.as_str(), "nvidia" | "nvidia-drm" | "nvidia_drm");
+ 
+         let cursor_size = Size::from((cursor_size.w as i32, cursor_size.h as i32));
+         let damage_tracker = OutputDamageTracker::from_mode_source(output_mode_source.clone());
+@@ -1387,6 +1385,8 @@
+                 })?
+             && plane_has_property(&*surface, surface.plane(), "IN_FENCE_FD")?
+             && !(is_nvidia && nvidia_drm_version().unwrap_or((0, 0, 0)) < (560, 35, 3));
++        debug!(driver = %driver_name, supports_fencing, legacy = surface.is_legacy(),
++               "KMS explicit fence capability");
+ 
+         let (swapchain, is_opaque) = Self::test_format(
+             &surface,

@@ -1,0 +1,12 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+release=$(readlink -f /usr/local/libexec/mocha-tablet-current)
+export NOCTALIA_ASSETS_DIR=/srv/mocha-data/codex-debian-desktop/local/share/noctalia/assets
+export MOCHA_TOUCH_LOCK_KEYBOARD=1
+# IPC clients only open the local shell socket. Avoid compositor/session and
+# GPU discovery for every capacitive navigation-key action.
+case "${1:-}" in
+    msg|--help|--version) exec "$release/noctalia" "$@" ;;
+esac
+exec /usr/local/libexec/mocha-native-app "$release/noctalia" "$@"

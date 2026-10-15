@@ -1,6 +1,6 @@
 # Mocha Moze Desktop
 
-> 为跑 Debian armhf 的小米平板 1 提供两条图形界面：横屏 Niri 桌面，以及只在充电时启动的竖屏电量界面。
+> 为跑 Debian armhf 的小米平板 1 提供横屏 Niri 桌面，以及与桌面方向一致的最小充电界面。
 
 [![License: GPL-2.0-only](https://img.shields.io/badge/License-GPL--2.0--only-blue.svg)](LICENSE)
 
@@ -10,16 +10,22 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 
 桌面这条线要解决的是软件渲染与横屏旋转叠加之后的显示问题：默认 Nouveau 走硬件着色器，但扫描输出仍是 simpledrm，所以有额外的显存搬运开销。充电这条线要解决的是另一件事——插着线开机时用户只想看到电量和能安全地回到桌面，不需要拉起整套会话。
 
+## 最新开发进度（2026-10-13）
+
+实机默认已切换到验证过的原生内核，正常开机、旋转后的桌面／触屏、中文输入与密码解锁已验收。完整 Nyxuri 配置和默认插件已部署；新增触屏手势、实体导航键、按键背光、手动键盘及参数设置，见 [实机触屏与 Nyxuri](docs/TABLET-NYXURI.md)。Noctalia ARM 插件初始化的内存对齐修复通过了 1,000 次真实 Luau 状态回归。下文 simpledrm／10 FPS 表述属于历史路径。
+
+原生 Tegra + Nouveau + WC Mesa 的受控窗口测试已达到约 60 FPS，完整桌面仍有偶发卡顿。同步修复、构建开关、探针和验证限制见 [NATIVE-PERFORMANCE.md](docs/NATIVE-PERFORMANCE.md)；跨仓库状态与远端任务见 [接续说明](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/HANDOFF-2026-10-11.md)。下面原 10 FPS/simpledrm 记录描述默认旧路径，不能作为本轮临时原生候选的状态。
+
 ## 现状
 
 | 项目 | 状态 |
 | --- | --- |
-| 横屏桌面（Niri + Noctalia + Firefox ESR） | 可运行，动画约 10 FPS |
+| 横屏桌面（Niri + Noctalia + Firefox ESR） | 原生桌面及完整 Nyxuri 效果已实机运行；完整桌面帧率待持续测量 |
 | 横屏旋转 damage | 已用 0003 修复黑条与残影 |
-| native Tegra + Nouveau 输出 | 约 29.8 FPS，Niri 在 Mesa 调用点崩溃，未默认启用 |
+| native Tegra + Nouveau 输出 | 已默认使用，GPU／Niri 显示正常；WC 与 native-sync 修复已持久安装 |
 | 视频播放 | 软件 H.264 / Firefox 已验证 |
 | 硬件编解码 | 未完成 |
-| 最小充电模式 | 可用，与桌面互斥切换 |
+| 最小充电模式 | 旋转、短暂拔插线唤醒、长按进入桌面已在本机确认；U-Boot 提前采样配套后插电按住冷启动直接进桌面 |
 | 音频硬件 | 无完整 RT5671 声卡，PipeWire 只证明服务在跑 |
 
 ## 上游固定版本
@@ -44,6 +50,8 @@ Niri 与 Smithay 的补丁不改上游许可证。本仓库没有附这两个项
 | `noctalia-armhf-cross.ini` | Noctalia 的 Meson cross file（位于仓库根目录） |
 | `patches/0002-smithay-primary-rotated-damage.patch` | 早期补丁，仅供对照，不再应用 |
 | `patches/0003-smithay-complete-rotated-damage.patch` | 当前使用，包含 0002 的全部改动 |
+| `patches/0004-mesa-tegra-optional-fence-callbacks.patch` | Mesa 25.0.7 的 Tegra 可选 fence 回调修复候选；单独应用到 Mesa，不能应用到 Smithay |
+| `tools/build-mesa.sh`、`tools/probe-egl-fence.py` | 构建独立 Mesa 候选与板上无 modeset 的 fence 回归；验收步骤见 [MESA-FENCE.md](docs/MESA-FENCE.md) |
 | `charging/` | Cairo framebuffer UI、BC1.2 探测与输入限流、按键状态机、systemd 单元与 boot generator |
 | `tools/` | 桌面与充电模式的构建、安装脚本 |
 | `services/README.md` | 系统级与用户级服务的依赖关系说明 |
@@ -173,6 +181,10 @@ sudo bash tools/install-session.sh mocha
 
 ## 最小充电模式
 
+2026-10-16 本机已经持久安装并确认：充电动画方向与桌面一致，自动熄屏后拔线约 2–3 秒再插回可重新亮屏，长按电源可进入桌面；配套 U-Boot 提前采样后，普通插电按住启动直接进入桌面。它仍是最小 Linux 充电环境，不控制原厂前级引导器的短按开机行为。完整证据见 [实机记录](https://github.com/Pisces-Moze/mocha-moze-debian/blob/codex/mocha-diagnostics-2026-10-09/docs/DIAGNOSTICS-2026-10-16.md)。
+
+`/etc/default/mocha-charger` 的 `MOCHA_CHARGER_TRANSFORM=90` 对应当前 Niri 的 270° 输出变换。安装器仅在配置不存在时写入该默认值，保留用户已有设置；UI 支持 0/90/180/270。
+
 主机侧编译充电 UI（Cairo 直接画 framebuffer，无需 GPU）：
 
 ```sh
@@ -195,7 +207,7 @@ sudo touch /boot/mocha-charger.enabled
 
 ### 启动与切换
 
-generator 在开机时读取 `/proc/cmdline`，条件是 `/boot/mocha-charger.enabled` 存在、充电器 `online` 为 1、`/boot/mocha-desktop.once` 不存在、命令行里没有 `systemd.unit=` 也没有 `mocha_native_debug4=1`。四个条件同时成立时，它在 early 目录里把 `default.target` 软链到 `mocha-charger.target`，于是桌面不启动。若存在 `/boot/mocha-desktop.once`，generator 会把它删掉并放行桌面一次。
+generator 在开机时读取 `/proc/cmdline`，条件是 `/boot/mocha-charger.enabled` 存在、充电器 `online` 为 1、`/boot/mocha-desktop.once` 不存在、命令行里没有 `systemd.unit=` 也没有 `mocha_native_debug4=1`。它还检查 U-Boot 的 `mocha_desktop_requested=1` 与 gpio-keys 当前按住状态，电量至少 5% 才接受桌面请求。满足充电条件且没有桌面请求时，在 early 目录把 `default.target` 软链到 `mocha-charger.target`。generator 不写 `/boot`；一次性标记由正常服务消费。
 
 `mocha-charger.target` 是 `AllowIsolate=yes` 的目标，依赖 `basic.target`、`local-fs.target`。`mocha-charger.service` 与 `getty@tty1.service`、`user@1000.service` 冲突，启动前 `loginctl terminate-user mocha`，再 `modprobe mocha_miui_backlight`，最后用 `systemd-inhibit --what=handle-power-key --mode=block` 包住 `mocha-charger-session`——这样充电界面处理电源键时，logind 不会再抢着关机或重启。
 
@@ -208,7 +220,7 @@ generator 在开机时读取 `/proc/cmdline`，条件是 `/boot/mocha-charger.en
 | 长按回桌面 | 持续按住 2 秒，且电量计读数 ≥ 5% |
 | 拔线关机 | 检测到离线超过 8 秒 |
 
-UI 用 `cairo_image_surface` 在内存里画 720×520 的电池图形，按 framebuffer 的 `red/green/blue/transp` 位域打包成 16 位或 32 位像素，只把居中这块区域复制到 `/dev/fb0`。入场、脉冲、退场三组动画帧在电量或在线状态变化时一次性预打包，主循环按 1/60 秒的节拍挑一帧贴上去，按住电源键时另外单独刷新底部那 192×4 像素的进度条。framebuffer 少于 16 位或分辨率小于 720×520 会直接以退出码 2 结束。运行期间把 tty1 切到 `KD_GRAPHICS`，退出时恢复原模式。三个可执行模式是 `--snapshot FILE`（导出一张 PNG，固定 67% 且在线）、`--preview`（跑 8 秒后还原屏幕原内容）、`--live`（正式模式）。设 `MOCHA_REDUCED_MOTION=1` 会关掉呼吸与缩放动画。
+UI 用 `cairo_image_surface` 在内存里画 720×520 的电池图形，按 framebuffer 的 `red/green/blue/transp` 位域打包成 16 位或 32 位像素，只复制居中区域到 `/dev/fb0`。先显示基础帧，主循环每轮至多准备一张入场／脉冲／退场帧，使用预计算采样和通道表，避免整套缓存阻塞线缆轮询；按住电源时刷新同方向的进度条。横向变换会交换所需宽高，格式和尺寸不支持时退出。短暂拔插会唤醒并重置 15 秒显示计时；启动时也快照读取已按住的物理电源键。运行期间把 tty1 切到 `KD_GRAPHICS`，退出恢复原模式。三个模式是 `--snapshot FILE`（导出 PNG，固定 67% 且在线）、`--preview`（跑 8 秒后还原屏幕）、`--live`（正式模式）。`MOCHA_REDUCED_MOTION=1` 关闭呼吸与缩放动画。
 
 ### BC1.2 输入限流
 
@@ -248,7 +260,7 @@ UI 用 `cairo_image_surface` 在内存里画 720×520 的电池图形，按 fram
 
 `0003` 修掉横屏 damage 造成的贯穿黑条与残影，但它没法单独消除跨 GPU 的输出复制。
 
-native Tegra + Nouveau 线性 DMA-BUF 的色块实机出图约 29.8 FPS，Niri 仍在 Mesa 的 `tegra_fence_server_sync` 调用点崩溃，所以没有默认启用。
+native Tegra + Nouveau 线性 DMA-BUF 的色块实机出图约 29.8 FPS。2026-10-10 原始内核＋native5 DTB＋手动分段校正的复测为 29.74 FPS；候选 Mesa 下的 Niri＋终端画面由用户确认正常。主动 DSI 复位候选后续通过自动 CPU/GPU/Niri 与第二次冷 RAM CPU/控制台验收；完整桌面与安装未验收，未默认启用。
 
 软件 H.264 / Firefox 播放已经验证过，硬件解码与编码尚未完成。
 
@@ -256,7 +268,7 @@ native Tegra + Nouveau 线性 DMA-BUF 的色块实机出图约 29.8 FPS，Niri �
 
 | 事项 | 状态 | 出处 |
 | --- | --- | --- |
-| native 桌面路径 | Niri 在 Mesa `tegra_fence_server_sync` 崩溃，未默认启用 | 仓库 README 性能章节、`services/README.md` |
+| native 桌面路径 | 候选 Mesa＋主动复位内核的自动分段 RAM Niri 画面正常；完整会话、触控与安装待完成，未默认启用 | 仓库 README 性能章节、`services/README.md` |
 | 硬件解码 / 编码 | 未完成，只有软件 H.264 验证过 | 仓库 README 性能章节 |
 | 音频硬件 | 现代内核无完整 RT5671 声卡，服务正常不代表出声 | `services/README.md` |
 | APP 分区扩容 / 完整桌面 rootfs 迁移 | 尚无通过实机验收的自动方案 | 仓库 README 设备安装章节 |

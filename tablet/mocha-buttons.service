@@ -1,0 +1,12 @@
+[Unit]
+Description=Mocha physical power and volume buttons
+PartOf=graphical-session.target niri.service
+After=niri.service
+
+[Service]
+ExecStart=/usr/local/libexec/mocha-session-exec /usr/bin/systemd-inhibit --what=handle-power-key --mode=block --who=MochaButtons --why=Touchscreen-lock-and-volume-controls /usr/local/libexec/mocha-buttons.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

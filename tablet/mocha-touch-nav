@@ -1,0 +1,130 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-2.0-only
+"""Shared touch-bar and capacitive-key navigation; never grabs the touchscreen."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import socket
+import sys
+
+
+def run(*args):
+    return subprocess.run(args, capture_output=True, text=True, timeout=3)
+
+
+def niri(request):
+    # Niri's documented newline-delimited JSON protocol. Avoid starting a
+    # compositor CLI process for each state query on this ARM tablet.
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(2)
+        connection.connect(os.environ['NIRI_SOCKET'])
+        connection.sendall((json.dumps(request)+'\n').encode())
+        with connection.makefile('rb') as reply:
+            response=json.loads(reply.readline(1024*1024))
+    if 'Err' in response:
+        raise ValueError('Niri rejected navigation request')
+    value=response['Ok']
+    return next(iter(value.values())) if isinstance(value,dict) else None
+
+
+def action(name, **arguments):
+    niri({'Action': {name: arguments}})
+
+
+def noctalia(command):
+    path=Path(os.environ['XDG_RUNTIME_DIR'])/('noctalia-'+os.environ.get('WAYLAND_DISPLAY','wayland-0')+'.sock')
+    try:
+        with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as connection:
+            connection.settimeout(2)
+            connection.connect(str(path))
+            connection.sendall(command.encode())
+            connection.shutdown(socket.SHUT_WR)
+            chunks=[]
+            while data:=connection.recv(4096):
+                chunks.append(data)
+                if sum(map(len,chunks))>65536:
+                    raise ValueError('Oversized shell response')
+        text=b''.join(chunks).decode()
+        return json.loads(text) if command=='status' else text
+    except OSError:
+        # Navigation remains usable while the independent shell restarts.
+        return None
+
+
+def close_panel():
+    status = noctalia('status')
+    if status and status.get('panelOpen'):
+        noctalia('panel-close')
+        return True
+    return False
+
+
+def close_overview():
+    state = niri('OverviewState')
+    if state and state.get('is_open'):
+        action('CloseOverview')
+        return True
+    return False
+
+
+def hide_keyboard():
+    try:
+        state = json.loads((Path(os.environ['XDG_RUNTIME_DIR']) / 'mocha-keyboard-visible.json').read_text())
+        if state.get('visible'):
+            # The service, rather than a persisted PID, owns the signal target.
+            result = run('systemctl', '--user', 'kill', '--signal=SIGUSR1', 'mocha-keyboard.service')
+            return result.returncode == 0
+    except (OSError, ValueError, KeyError):
+        pass
+    return False
+
+
+def main():
+    command = sys.argv[1] if len(sys.argv) == 2 else ''
+    if command == 'back':
+        if not hide_keyboard():
+            if not close_panel() and not close_overview():
+                focused = niri('FocusedWindow')
+                # Empty desktops have no input target. Creating a virtual
+                # keyboard here wakes the compositor without changing the UI.
+                if not focused:
+                    return 0
+                application = (focused or {}).get('app_id', '').lower()
+                if any(browser in application for browser in ('firefox', 'chromium', 'google-chrome')):
+                    run('wtype', '-M', 'alt', '-k', 'Left', '-m', 'alt')
+                else:
+                    run('wtype', '-k', 'Escape')
+    elif command == 'home':
+        hide_keyboard()
+        close_panel()
+        close_overview()
+        spaces = niri('Workspaces')
+        if spaces:
+            windows = niri('Windows')
+            occupied = {window['workspace_id'] for window in windows}
+            current = next((space for space in spaces if space.get('is_focused')), None)
+            if current and current['id'] not in occupied:
+                return 0
+            empty = [space for space in spaces if space['id'] not in occupied
+                     and (not current or space.get('output') == current.get('output'))]
+            if empty:
+                destination = next((space for space in empty if space.get('is_active')), empty[-1])
+                action('FocusWorkspace', reference={'Id':destination['id']})
+    elif command == 'overview':
+        hide_keyboard()
+        action('ToggleOverview')
+    elif command in ('close', 'maximize', 'fullscreen'):
+        action({'close':'CloseWindow','maximize':'MaximizeColumn','fullscreen':'FullscreenWindow'}[command])
+    else:
+        return 2
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+        # A compositor restart can remove an IPC socket between two queries.
+        # Never log window contents or input, and leave the next press usable.
+        raise SystemExit(1)

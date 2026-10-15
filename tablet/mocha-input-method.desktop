@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Chinese / English Input
+Name[zh_CN]=中英文输入切换
+Exec=/usr/local/bin/mocha-input-method
+Icon=input-keyboard
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=Chinese;Pinyin;中文;拼音;

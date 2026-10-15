@@ -1,0 +1,49 @@
+From: Mocha Moze developers
+Subject: [PATCH] tegra: expose fence callbacks only when Nouveau implements them
+
+Mesa 25.0.7's Nouveau context does not implement fence_server_sync or
+create_fence_fd, and its screen does not implement fence_get_fd. Tegra
+nevertheless installs wrappers for all three callbacks. DRI's server wait
+checks the outer callback before calling it, so this turns an optional
+operation into a call through a NULL inner function pointer.
+
+Preserve Nouveau's optional callback contract at the Tegra boundary. Do
+not invent sync-file support or silently drop waits inside a wrapper.
+The always-supported fence_reference/fence_finish paths stay intact.
+
+Base: Mesa mesa-25.0.7, commit 742a20f48c59e8649533c84c4d49dd95b403f5da.
+Upstream: https://gitlab.freedesktop.org/mesa/mesa
+The modified upstream files retain their MIT license and copyright.
+Candidate fix; native desktop and panel acceptance still required.
+---
+diff --git a/src/gallium/drivers/tegra/tegra_context.c b/src/gallium/drivers/tegra/tegra_context.c
+--- a/src/gallium/drivers/tegra/tegra_context.c
++++ b/src/gallium/drivers/tegra/tegra_context.c
+@@ -1376,8 +1376,12 @@ tegra_screen_context_create(struct pipe_screen *pscreen,
+    context->base.clear_buffer = tegra_clear_buffer;
+    context->base.flush = tegra_flush;
+ 
+-   context->base.create_fence_fd = tegra_create_fence_fd;
+-   context->base.fence_server_sync = tegra_fence_server_sync;
++   /* Optional GPU callbacks must remain optional through the wrapper. */
++   if (context->gpu->create_fence_fd)
++      context->base.create_fence_fd = tegra_create_fence_fd;
++
++   if (context->gpu->fence_server_sync)
++      context->base.fence_server_sync = tegra_fence_server_sync;
+ 
+    context->base.create_sampler_view = tegra_create_sampler_view;
+    context->base.sampler_view_destroy = tegra_sampler_view_destroy;
+diff --git a/src/gallium/drivers/tegra/tegra_screen.c b/src/gallium/drivers/tegra/tegra_screen.c
+--- a/src/gallium/drivers/tegra/tegra_screen.c
++++ b/src/gallium/drivers/tegra/tegra_screen.c
+@@ -611,7 +611,8 @@ tegra_screen_create(int fd)
+    screen->base.flush_frontbuffer = tegra_screen_flush_frontbuffer;
+    screen->base.fence_reference = tegra_screen_fence_reference;
+    screen->base.fence_finish = tegra_screen_fence_finish;
+-   screen->base.fence_get_fd = tegra_screen_fence_get_fd;
++   if (screen->gpu->fence_get_fd)
++      screen->base.fence_get_fd = tegra_screen_fence_get_fd;
+ 
+    screen->base.get_driver_query_info = tegra_screen_get_driver_query_info;
+    screen->base.get_driver_query_group_info = tegra_screen_get_driver_query_group_info;

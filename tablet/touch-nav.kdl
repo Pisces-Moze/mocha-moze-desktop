@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// maXTouch KEY_HOME=102, KEY_MENU=139, KEY_BACK=158; no EVIOCGRAB.
+binds {
+    Home repeat=false { spawn "/usr/local/bin/mocha-touch-nav" "home"; }
+    // KEY_MENU is evdev I147 / XF86MenuKB, not the Compose-key Menu symbol.
+    XF86MenuKB repeat=false cooldown-ms=150 { spawn "/usr/local/bin/mocha-touch-nav" "overview"; }
+    XF86Back repeat=false { spawn "/usr/local/bin/mocha-touch-nav" "back"; }
+}

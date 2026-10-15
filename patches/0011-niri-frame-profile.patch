@@ -1,0 +1,61 @@
+--- a/src/backend/tty.rs
++++ b/src/backend/tty.rs
+@@ -1847,6 +1847,8 @@
+         target_presentation_time: Duration,
+     ) -> RenderResult {
+         let span = tracy_client::span!("Tty::render");
++        let mocha_profile = std::env::var_os("MOCHA_FRAME_PROFILE").is_some();
++        let mocha_start = std::time::Instant::now();
+ 
+         let mut rv = RenderResult::Skipped;
+ 
+@@ -1888,6 +1890,7 @@
+             xray: None,
+         };
+         let mut elements = niri.render_to_vec(ctx, output, true);
++        let mocha_elements = std::time::Instant::now();
+ 
+         // Visualize the damage, if enabled.
+         if niri.debug_draw_damage {
+@@ -1929,8 +1932,11 @@
+ 
+         // Hand them over to the DRM.
+         let drm_compositor = &mut surface.compositor;
++        let mocha_render_start = std::time::Instant::now();
+         match drm_compositor.render_frame::<_, _>(&mut renderer, &elements, [0.; 4], flags) {
+             Ok(res) => {
++                let mocha_render_ms = mocha_render_start.elapsed().as_secs_f64() * 1000.;
++                let mut mocha_wait_ms = 0.;
+                 let needs_sync = res.needs_sync()
+                     || self
+                         .config
+@@ -1940,9 +1946,11 @@
+                 if needs_sync {
+                     if let PrimaryPlaneElement::Swapchain(element) = res.primary_element {
+                         let _span = tracy_client::span!("wait for completion");
++                        let mocha_wait_start = std::time::Instant::now();
+                         if let Err(err) = element.sync.wait() {
+                             warn!("error waiting for frame completion: {err:?}");
+                         }
++                        mocha_wait_ms = mocha_wait_start.elapsed().as_secs_f64() * 1000.;
+                     }
+                 }
+ 
+@@ -1956,8 +1964,17 @@
+                         niri.take_presentation_feedbacks(output, &res.states);
+                     let data = (presentation_feedbacks, target_presentation_time);
+ 
++                    let mocha_queue_start = std::time::Instant::now();
+                     match drm_compositor.queue_frame(data) {
+                         Ok(()) => {
++                            if mocha_profile {
++                                eprintln!("MOCHA_FRAME elements_ms={:.3} render_ms={:.3} wait_ms={:.3} queue_ms={:.3} total_ms={:.3} needs_sync={} elements={}",
++                                    mocha_elements.duration_since(mocha_start).as_secs_f64() * 1000.,
++                                    mocha_render_ms, mocha_wait_ms,
++                                    mocha_queue_start.elapsed().as_secs_f64() * 1000.,
++                                    mocha_start.elapsed().as_secs_f64() * 1000.,
++                                    needs_sync, elements.len());
++                            }
+                             let output_state = niri.output_state.get_mut(output).unwrap();
+                             let new_state = RedrawState::WaitingForVBlank {
+                                 redraw_needed: false,

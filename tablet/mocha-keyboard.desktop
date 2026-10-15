@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Touch Keyboard
+Name[zh_CN]=触屏键盘
+Comment=Open or hide the on-screen keyboard
+Exec=/usr/local/bin/mocha-keyboard
+Icon=input-keyboard
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=keyboard;touch;键盘;触屏;

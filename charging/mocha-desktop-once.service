@@ -1,0 +1,12 @@
+[Unit]
+Description=Consume the one-boot Mocha desktop override
+ConditionPathExists=/boot/mocha-desktop.once
+After=local-fs.target
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rm -f /boot/mocha-desktop.once
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Mocha capacitive navigation key backlight
+After=systemd-udev-settle.service
+RequiresMountsFor=/srv/mocha-data
+ConditionPathExists=/sys/kernel/debug/pinctrl/70000868.pinmux/pinmux-pins
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/mocha-touch-key-lights.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+Nice=10
+MemoryMax=32M
+
+[Install]
+WantedBy=multi-user.target

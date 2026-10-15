@@ -1,0 +1,35 @@
+--- a/src/render/gl_shared_context.cpp
++++ b/src/render/gl_shared_context.cpp
+@@ -3,6 +3,7 @@
+ #include "core/log.h"
+ 
+ #include <EGL/eglext.h>
++#include <cstdlib>
+ #include <format>
+ #include <stdexcept>
+ #include <string_view>
+@@ -125,8 +126,11 @@
+ 
+ void GlSharedContext::buildContextAttributes() {
+   const char* extensions = eglQueryString(m_display, EGL_EXTENSIONS);
+-  const bool hasRobustness = hasExtension(extensions, "EGL_EXT_create_context_robustness");
+-  const bool hasVideoMemoryPurge = hasExtension(extensions, "EGL_NV_robustness_video_memory_purge");
++  const char* disableRobustness = std::getenv("NOCTALIA_DISABLE_EGL_ROBUSTNESS");
++  const bool robustnessDisabled =
++      disableRobustness != nullptr && disableRobustness[0] != '\0' && disableRobustness[0] != '0';
++  const bool hasRobustness = !robustnessDisabled && hasExtension(extensions, "EGL_EXT_create_context_robustness");
++  const bool hasVideoMemoryPurge = hasRobustness && hasExtension(extensions, "EGL_NV_robustness_video_memory_purge");
+ 
+   m_contextAttributes.clear();
+   m_contextAttributes.push_back(EGL_CONTEXT_CLIENT_VERSION);
+@@ -145,7 +149,9 @@
+   m_resetNotificationEnabled = hasRobustness;
+   m_videoMemoryPurgeNotificationEnabled = hasRobustness && hasVideoMemoryPurge;
+ 
+-  if (m_videoMemoryPurgeNotificationEnabled) {
++  if (robustnessDisabled) {
++    kLog.info("EGL robustness disabled by NOCTALIA_DISABLE_EGL_ROBUSTNESS");
++  } else if (m_videoMemoryPurgeNotificationEnabled) {
+     kLog.info("requesting robust EGL contexts with NVIDIA video-memory purge reset notification");
+   } else if (m_resetNotificationEnabled) {
+     kLog.info("requesting robust EGL contexts with graphics reset notification");

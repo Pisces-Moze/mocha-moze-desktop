@@ -1,0 +1,132 @@
+From: Mocha maintainers
+Subject: [PATCH] tegra: reference-count and release imported scanout GEM handles
+
+--- a/src/gallium/drivers/tegra/tegra_screen.h
++++ b/src/gallium/drivers/tegra/tegra_screen.h
+@@ -25,6 +25,7 @@
+ #define TEGRA_SCREEN_H
+ 
+ #include "pipe/p_screen.h"
++#include "util/simple_mtx.h"
+ 
+ struct tegra_screen {
+    struct pipe_screen base;
+@@ -32,6 +33,9 @@
+ 
+    struct pipe_screen *gpu;
+    int gpu_fd;
++
++   simple_mtx_t scanout_lock;
++   struct tegra_scanout_handle *scanout_handles;
+ };
+ 
+ static inline struct tegra_screen *
+--- a/src/gallium/drivers/tegra/tegra_screen.c
++++ b/src/gallium/drivers/tegra/tegra_screen.c
+@@ -46,10 +46,76 @@
+ #include "tegra_resource.h"
+ #include "tegra_screen.h"
+ 
++/* GEM PRIME imports deduplicate handles but do not reference-count them.
++ * Track wrapper ownership under one lock, including the import itself, so
++ * concurrent imports cannot race the final close of an existing handle.
++ */
++struct tegra_scanout_handle {
++   uint32_t handle;
++   unsigned references;
++   struct tegra_scanout_handle *next;
++};
++
++static int
++tegra_scanout_import(struct tegra_screen *screen, int fd, uint32_t *handle)
++{
++   struct tegra_scanout_handle *pending = calloc(1, sizeof(*pending));
++   if (!pending)
++      return -ENOMEM;
++
++   simple_mtx_lock(&screen->scanout_lock);
++   int err = drmPrimeFDToHandle(screen->fd, fd, handle);
++   if (err < 0) {
++      err = -errno;
++      simple_mtx_unlock(&screen->scanout_lock);
++      free(pending);
++      return err;
++   }
++   for (struct tegra_scanout_handle *entry = screen->scanout_handles;
++        entry; entry = entry->next) {
++      if (entry->handle == *handle) {
++         entry->references++;
++         simple_mtx_unlock(&screen->scanout_lock);
++         free(pending);
++         return 0;
++      }
++   }
++   pending->handle = *handle;
++   pending->references = 1;
++   pending->next = screen->scanout_handles;
++   screen->scanout_handles = pending;
++   simple_mtx_unlock(&screen->scanout_lock);
++   return 0;
++}
++
++static void
++tegra_scanout_release(struct tegra_screen *screen, uint32_t handle)
++{
++   if (!handle)
++      return;
++   simple_mtx_lock(&screen->scanout_lock);
++   struct tegra_scanout_handle **link = &screen->scanout_handles;
++   while (*link) {
++      struct tegra_scanout_handle *entry = *link;
++      if (entry->handle == handle) {
++         if (--entry->references == 0) {
++            drmCloseBufferHandle(screen->fd, handle);
++            *link = entry->next;
++            free(entry);
++         }
++         break;
++      }
++      link = &entry->next;
++   }
++   simple_mtx_unlock(&screen->scanout_lock);
++}
++
+ static void tegra_screen_destroy(struct pipe_screen *pscreen)
+ {
+    struct tegra_screen *screen = to_tegra_screen(pscreen);
+ 
++   assert(screen->scanout_handles == NULL);
++   simple_mtx_destroy(&screen->scanout_lock);
+    screen->gpu->destroy(screen->gpu);
+    free(pscreen);
+ }
+@@ -176,9 +242,7 @@
+    resource->stride = handle.stride;
+    fd = handle.handle;
+ 
+-   err = drmPrimeFDToHandle(screen->fd, fd, &resource->handle);
+-   if (err < 0)
+-      err = -errno;
++   err = tegra_scanout_import(screen, fd, &resource->handle);
+ 
+    close(fd);
+ 
+@@ -340,6 +404,9 @@
+ {
+    struct tegra_resource *resource = to_tegra_resource(presource);
+ 
++   /* Release the Tegra import as well as the Nouveau resource. */
++   tegra_scanout_release(to_tegra_screen(pscreen), resource->handle);
++
+    /* adjust private reference count */
+    p_atomic_add(&resource->gpu->reference.count, -resource->refcount);
+    pipe_resource_reference(&resource->gpu, NULL);
+@@ -583,6 +650,8 @@
+       free(screen);
+       return NULL;
+    }
++
++   simple_mtx_init(&screen->scanout_lock, mtx_plain);
+ 
+    screen->base.destroy = tegra_screen_destroy;
+    screen->base.get_name = tegra_screen_get_name;

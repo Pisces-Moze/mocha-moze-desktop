@@ -1,0 +1,170 @@
+diff --git a/src/shell/lockscreen/lock_surface.cpp b/src/shell/lockscreen/lock_surface.cpp
+index 7c03bb4..6e9a948 100644
+--- a/src/shell/lockscreen/lock_surface.cpp
++++ b/src/shell/lockscreen/lock_surface.cpp
+@@ -29,6 +29,7 @@
+ #include "wayland/wayland_connection.h"
+ #include "wayland/wayland_seat.h"
+ 
++#include <cstdlib>
+ #include <algorithm>
+ #include <chrono>
+ #include <cmath>
+@@ -477,6 +478,8 @@ LockSurface::LockSurface(WaylandConnection& connection, ConfigService* config) :
+       })
+   );
+ 
++  buildTouchKeyboard();
++
+   m_loginContentRow->addChild(
+       ui::input({
+           .out = &m_passwordField,
+@@ -1206,6 +1209,25 @@ void LockSurface::layoutScene(std::uint32_t width, std::uint32_t height) {
+   panelX = util::clampOrdered(panelX, Style::spaceLg, sw - panelWidth - Style::spaceLg);
+   panelY = util::clampOrdered(panelY, Style::spaceLg, sh - panelHeight - Style::spaceLg);
+ 
++  // The keyboard is part of the trusted ext-session-lock surface. External
++  // layer-shell keyboards are deliberately hidden by the compositor while locked.
++  if (m_touchKeyboard != nullptr) {
++    const bool visible = loginVisible && m_locked && !m_blackout;
++    m_touchKeyboard->setVisible(visible);
++    if (visible) {
++      constexpr float keyboardHeight = 260.0F;
++      const float keyboardWidth = sw - 2.0F * Style::spaceLg;
++      const float keyboardY = sh - keyboardHeight - Style::spaceLg;
++      panelY = std::max(Style::spaceLg, std::min(panelY, keyboardY - panelHeight - Style::spaceLg));
++      m_touchKeyboard->arrange(renderer, LayoutRect{
++          (sw - keyboardWidth) * 0.5F, keyboardY, keyboardWidth, keyboardHeight});
++      for (Button* button : m_touchKeyButtons) {
++        button->setEnabled(!m_authenticating);
++      }
++    }
++  }
++
++
+   m_root.setSize(sw, sh);
+ 
+   m_backgroundLayer->setPosition(0.0F, 0.0F);
+@@ -1488,6 +1510,97 @@ void LockSurface::layoutScene(std::uint32_t width, std::uint32_t height) {
+   syncTransitionCover();
+ }
+ 
++// Mocha opt-in touch keyboard; no password text is emitted to IPC or logs.
++void LockSurface::buildTouchKeyboard() {
++  const char* enabled = std::getenv("MOCHA_TOUCH_LOCK_KEYBOARD");
++  if (enabled == nullptr || std::string_view(enabled) != "1") {
++    return;
++  }
++  m_root.addChild(ui::flex(FlexDirection::Vertical, {
++      .out = &m_touchKeyboard, .align = FlexAlign::Stretch,
++      .justify = FlexJustify::Start, .gap = 8.0F,
++      .widthPolicy = FlexSizePolicy::Fill, .heightPolicy = FlexSizePolicy::Fill,
++  }));
++  m_touchKeyboard->setZIndex(20);
++  for (int rowIndex = 0; rowIndex < 5; ++rowIndex) {
++    Flex* row = nullptr;
++    m_touchKeyboard->addChild(ui::flex(FlexDirection::Horizontal, {
++        .out = &row, .align = FlexAlign::Stretch,
++        .justify = FlexJustify::Start, .gap = 6.0F,
++        .widthPolicy = FlexSizePolicy::Fill, .heightPolicy = FlexSizePolicy::Content,
++    }));
++    row->setMinHeight(44.0F);
++    row->setMaxHeight(44.0F);
++    const int count = rowIndex == 4 ? 5 : 10;
++    for (int index = 0; index < count; ++index) {
++      Button* button = nullptr;
++      row->addChild(ui::button({
++          .out = &button, .text = "", .fontSize = 22.0F,
++          .variant = ButtonVariant::Secondary,
++          .onClick = [this, rowIndex, index]() {
++            if (m_authenticating) return;
++            const std::array<std::string, 4> letters = {
++                "1234567890", "qwertyuiop", "asdfghjkl;", "zxcvbnm,./"};
++            const std::array<std::string, 4> symbols = {
++                "!@#$%^&*()", "_+-=[]{}\\|", ":;\"'<>,.?/", "`~12345678"};
++            const std::array<std::string, 5> controls = {"Shift", "#+=", "Space", "Backspace", "Enter"};
++            if (rowIndex == 4) {
++              touchKeyboardKey(controls[index]);
++            } else {
++              char key = (m_touchSymbols ? symbols : letters)[rowIndex][index];
++              if (m_touchShift && key >= 'a' && key <= 'z') key -= 'a' - 'A';
++              touchKeyboardKey(std::string(1, key));
++            }
++          },
++          .configure = [](Button& key) { key.setFlexGrow(1.0F); key.setMinWidth(0.0F); key.setMaxWidth(0.0F); },
++      }));
++      const auto bg = colorSpecFromRole(rowIndex == 4 ? ColorRole::Secondary : ColorRole::SurfaceVariant);
++      const auto fg = colorSpecFromRole(rowIndex == 4 ? ColorRole::OnSecondary : ColorRole::OnSurface);
++      const auto press = colorSpecFromRole(ColorRole::Primary);
++      button->setRadius(8.0F);
++      button->setCustomPalette(Button::ButtonPalette{
++          .normal = {.bg = bg, .border = bg, .label = fg},
++          .hover = {.bg = bg, .border = bg, .label = fg},
++          .pressed = {.bg = press, .border = press, .label = colorSpecFromRole(ColorRole::OnPrimary)},
++          .disabled = {.bg = bg, .border = bg, .label = fg},
++      });
++      m_touchKeyButtons.push_back(button);
++    }
++  }
++  refreshTouchKeyboard();
++}
++
++void LockSurface::refreshTouchKeyboard() {
++  const std::array<std::string, 4> letters = {
++      "1234567890", "qwertyuiop", "asdfghjkl;", "zxcvbnm,./"};
++  const std::array<std::string, 4> symbols = {
++      "!@#$%^&*()", "_+-=[]{}\\|", ":;\"'<>,.?/", "`~12345678"};
++  const std::array<std::string, 5> controls = {"Shift", "#+=", "Space", "Backspace", "Enter"};
++  for (std::size_t i = 0; i < m_touchKeyButtons.size(); ++i) {
++    if (i >= 40) {
++      const std::array<std::string, 5> labels = {"⇧", "123", " ", "⌫", "Enter"};
++      m_touchKeyButtons[i]->setText(labels[i - 40]);
++    } else {
++      char key = (m_touchSymbols ? symbols : letters)[i / 10][i % 10];
++      if (m_touchShift && key >= 'a' && key <= 'z') key -= 'a' - 'A';
++      m_touchKeyButtons[i]->setText(std::string(1, key));
++    }
++  }
++  requestUpdate();
++}
++
++void LockSurface::touchKeyboardKey(const std::string& key) {
++  if (key == "Shift") { m_touchShift = !m_touchShift; refreshTouchKeyboard(); return; }
++  if (key == "#+=") { m_touchSymbols = !m_touchSymbols; refreshTouchKeyboard(); return; }
++  // Use the same editor as physical keys, including caret position and the
++  // select-all state after a failed attempt. Direct string append lost edits.
++  std::uint32_t sym = key == "Backspace" ? 0xff08 : key == "Enter" ? 0xff0d : key == "Space" ? 32 : static_cast<unsigned char>(key[0]);
++  const std::uint32_t utf32 = sym < 128 ? sym : 0;
++  m_passwordField->inputArea()->dispatchKey(sym, utf32, 0, true);
++  m_passwordField->inputArea()->dispatchKey(sym, utf32, 0, false);
++  requestUpdate();
++}
++
+ void LockSurface::updateCopy() {
+   m_passwordField->setValue(m_password);
+   m_passwordField->setEnabled(!m_authenticating);
+diff --git a/src/shell/lockscreen/lock_surface.h b/src/shell/lockscreen/lock_surface.h
+index 949c283..9d7347c 100644
+--- a/src/shell/lockscreen/lock_surface.h
++++ b/src/shell/lockscreen/lock_surface.h
+@@ -148,6 +148,9 @@ private:
+   [[nodiscard]] std::string resolveStatusText(const lockscreen_login_box::LoginBoxStyle& style, bool& isError) const;
+   [[nodiscard]] bool passwordFieldContainsPoint(float sceneX, float sceneY) const;
+   void focusPasswordField();
++  void buildTouchKeyboard();
++  void touchKeyboardKey(const std::string& key);
++  void refreshTouchKeyboard();
+ 
+   ext_session_lock_surface_v1* m_lockSurface = nullptr;
+   wl_output* m_output = nullptr;
+@@ -162,6 +165,10 @@ private:
+   WallpaperNode* m_wallpaper = nullptr;
+   Box* m_tintOverlay = nullptr;
+   Box* m_backdrop = nullptr;
++  Flex* m_touchKeyboard = nullptr;
++  std::vector<Button*> m_touchKeyButtons;
++  bool m_touchShift = false;
++  bool m_touchSymbols = false;
+   Flex* m_loginPanel = nullptr;
+   Flex* m_infoRow = nullptr;
+   Flex* m_mediaBlock = nullptr;

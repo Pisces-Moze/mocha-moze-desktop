@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Mocha landscape, rotated 180 degrees relative to the earlier transform 90.
+input {
+    keyboard { xkb { layout "us"; }; }
+    touchpad { tap; natural-scroll; dwt; }
+    touch { map-to-output "DSI-1"; }
+    disable-power-key-handling
+}
+hotkey-overlay { skip-at-startup; }
+output "DSI-1" { scale 1.5; transform "270"; }
+output "Unknown-1" { scale 1.5; transform "270"; }
+layout {
+    gaps 12
+    default-column-width { proportion 0.9; }
+    preset-column-widths { proportion 0.5; proportion 0.75; proportion 0.9; }
+    center-focused-column "on-overflow"
+    focus-ring { width 2; active-color "#b6c7e7"; inactive-color "#374761"; }
+    insert-hint { color "#b6c7e780"; }
+    shadow { off; }
+}
+animations {
+    workspace-switch { spring damping-ratio=0.9 stiffness=523 epsilon=0.001; }
+    horizontal-view-movement { spring damping-ratio=0.9 stiffness=423 epsilon=0.001; }
+    window-open { duration-ms 150; curve "ease-out-expo"; }
+    window-close { duration-ms 120; curve "ease-out-quad"; }
+    overview-open-close { spring damping-ratio=0.9 stiffness=800 epsilon=0.001; }
+}
+spawn-at-startup "/usr/local/bin/noctalia"
+window-rule { geometry-corner-radius 12; clip-to-geometry true; }
+window-rule { match app-id="dev.noctalia.Noctalia"; open-floating true; }
+layer-rule { match namespace="^noctalia-"; background-effect { blur false; }; }
+debug {
+    honor-xdg-activation-with-invalid-serial
+    render-drm-device "/dev/dri/renderD128"
+}
+include "gestures.kdl"
+binds {
+    Mod+Return { spawn "foot"; }
+    Mod+B { spawn "firefox-esr"; }
+    Mod+Space { spawn "/usr/local/bin/noctalia" "msg" "panel-toggle" "launcher"; }
+    Mod+S { spawn "/usr/local/bin/noctalia" "msg" "panel-toggle" "control-center"; }
+    Mod+Comma { spawn "/usr/local/bin/noctalia" "msg" "settings-toggle"; }
+    Mod+K { spawn "/usr/local/bin/mocha-keyboard"; }
+    Mod+Q { close-window; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+Tab { toggle-overview; }
+    Mod+Left { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up { focus-workspace-up; }
+    Mod+Down { focus-workspace-down; }
+    Mod+Shift+Left { move-column-left; }
+    Mod+Shift+Right { move-column-right; }
+    Mod+Shift+Up { move-window-to-workspace-up; }
+    Mod+Shift+Down { move-window-to-workspace-down; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "/usr/local/bin/noctalia" "msg" "volume-up" "5"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "/usr/local/bin/noctalia" "msg" "volume-down" "5"; }
+}

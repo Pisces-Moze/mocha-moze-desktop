@@ -3,10 +3,30 @@
 from pathlib import Path
 import sys
 
-def select_charge(enabled, online, command_line, desktop_once):
+def select_charge(enabled, online, command_line, desktop_once, power_requested=False):
     explicit = any(word.startswith('systemd.unit=') or word == 'mocha_native_debug4=1'
                    for word in command_line.split())
-    return enabled and online and not desktop_once and not explicit
+    return enabled and online and not desktop_once and not explicit and not power_requested
+
+def power_key_held():
+    # Snapshot the physical key: a key held before evdev opened has no new
+    # press edge. Never consume touchscreen events or grab an input device.
+    import fcntl
+    key=116
+    size=96
+    request=(2 << 30)|(size << 16)|(ord('E') << 8)|0x18
+    for event in Path('/sys/class/input').glob('event*'):
+        try:
+            if (event/'device/name').read_text().strip()!='gpio-keys':
+                continue
+            with (Path('/dev/input')/event.name).open('rb',buffering=0) as device:
+                bits=bytearray(size)
+                fcntl.ioctl(device,request,bits,True)
+                if bits[key//8] & (1 << (key%8)):
+                    return True
+        except OSError:
+            continue
+    return False
 
 def main():
     if len(sys.argv) != 4:
@@ -15,13 +35,20 @@ def main():
         return
     once = Path('/boot/mocha-desktop.once')
     desktop_once = once.exists()
-    if desktop_once:
-        once.unlink()
+    # Generators run with the system filesystem read-only. Consume this marker
+    # in a normal boot service; writing /boot here made the entire generator fail.
     try:
         online = Path('/sys/class/power_supply/bq24190-charger/online').read_text().strip() == '1'
     except OSError:
         online = False
-    if select_charge(True, online, Path('/proc/cmdline').read_text(), desktop_once):
+    command_line=Path('/proc/cmdline').read_text()
+    requested='mocha_desktop_requested=1' in command_line.split() or power_key_held()
+    try:
+        capacity=int(Path('/sys/class/power_supply/bq27520g4-0/capacity').read_text())
+    except (OSError,ValueError):
+        capacity=-1
+    requested=requested and capacity>=5
+    if select_charge(True, online, command_line, desktop_once,requested):
         early = Path(sys.argv[2])
         early.mkdir(parents=True, exist_ok=True)
         (early / 'default.target').symlink_to('/etc/systemd/system/mocha-charger.target')

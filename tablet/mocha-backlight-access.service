@@ -1,0 +1,13 @@
+[Unit]
+Description=Allow the local video group to blank the Mocha backlight
+Requires=mocha-desktop-hardware.service
+After=mocha-desktop-hardware.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/chgrp video /sys/class/backlight/mocha-miui-backlight/brightness
+ExecStart=/usr/bin/chmod 0664 /sys/class/backlight/mocha-miui-backlight/brightness
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

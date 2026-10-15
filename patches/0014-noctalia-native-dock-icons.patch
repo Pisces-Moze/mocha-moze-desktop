@@ -1,0 +1,47 @@
+From: Mocha maintainers
+Subject: [PATCH] dock: opt-in linear icon sampling for native GK20A
+
+--- a/src/shell/dock/dock_items.cpp
++++ b/src/shell/dock/dock_items.cpp
+@@ -22,6 +22,8 @@
+ #include <chrono>
+ #include <cmath>
+ #include <cstdint>
++#include <cstdlib>
++#include <cstring>
+ #include <linux/input-event-codes.h>
+ #include <memory>
+ #include <numbers>
+@@ -68,6 +70,14 @@
+     TooltipManager::instance().onHoverChange(nullptr, static_cast<zwlr_layer_surface_v1*>(nullptr), nullptr);
+   }
+ 
++  [[nodiscard]] bool dockIconMipmaps() {
++    // Native GK20A currently corrupts mipmapped Dock icons. Keep the
++    // decoded peak-resolution image and linear sampling; all geometry,
++    // hover animations and other shell textures retain their normal path.
++    const char* compatibility = std::getenv("MOCHA_DOCK_LINEAR_ICONS");
++    return compatibility == nullptr || std::strcmp(compatibility, "1") != 0;
++  }
++
+   [[nodiscard]] int dockIconDecodeTargetSize(const DockConfig& cfg) {
+     const float baseScale = std::max(cfg.activeScale, cfg.inactiveScale);
+     const float hoverScale = cfg.magnification ? std::max(1.0F, cfg.magnificationScale) : 1.0F;
+@@ -421,7 +431,7 @@
+           .width = iSize,
+           .height = iSize,
+           .configure = [&cfg, iSize, &renderer, iconDecodeTarget](Image& image) {
+-            image.setSourceFile(renderer, cfg.launcherCustomImage, iconDecodeTarget, true);
++            image.setSourceFile(renderer, cfg.launcherCustomImage, iconDecodeTarget, dockIconMipmaps());
+             image.setForegroundTint(
+                 cfg.launcherCustomImageColorize ? std::optional<ColorSpec>{colorSpecFromRole(ColorRole::OnSurface)}
+                                                 : std::nullopt
+@@ -573,7 +583,7 @@
+                         &shell = deps.model.config.config().shell](Image& image) {
+             image.setAppIconColorization(effectiveShellAppIconColorizationTint(shell));
+             if (!iconPath.empty()) {
+-              image.setSourceFile(renderer, iconPath, iconDecodeTarget, true);
++              image.setSourceFile(renderer, iconPath, iconDecodeTarget, dockIconMipmaps());
+             }
+             image.setPosition(kCellPad, kCellPad);
+           },
