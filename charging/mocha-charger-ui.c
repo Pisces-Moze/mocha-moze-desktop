@@ -27,10 +27,15 @@
 #define H 520
 static volatile sig_atomic_t stop;
 static bool net_charging=true;
-static bool rotate270;
+static unsigned rotation;
 static void interrupted(int signal_number) { (void)signal_number;stop=1; }
 static double now(void) { struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec+t.tv_nsec/1e9; }
 static int read_int(const char *path, int fallback) { FILE *f=fopen(path,"r");int n=fallback;if(f){if(fscanf(f,"%d",&n)!=1)n=fallback;fclose(f);}return n; }
+static bool power_held(int fd) {
+ unsigned char keys[(KEY_MAX+8)/8]={0};
+ return fd>=0&&!ioctl(fd,EVIOCGKEY(sizeof(keys)),keys)&&
+        (keys[KEY_POWER/8]&(1u<<(KEY_POWER%8)));
+}
 static void write_int(const char *path,int n) { FILE *f=fopen(path,"w");if(f){fprintf(f,"%d\n",n);fclose(f);} }
 static void round_rect(cairo_t *c,double x,double y,double w,double h,double r) {
  cairo_new_sub_path(c);cairo_arc(c,x+w-r,y+r,r,-M_PI/2,0);cairo_arc(c,x+w-r,y+h-r,r,0,M_PI/2);
@@ -82,21 +87,37 @@ static uint32_t channel(unsigned byte,struct fb_bitfield field) {
 static uint8_t *pack(const struct fb_var_screeninfo *v,cairo_surface_t *surface,double opacity,double scale) {
  const uint32_t *src=(const uint32_t *)cairo_image_surface_get_data(surface);
  unsigned bytes=v->bits_per_pixel/8;uint8_t *packed=calloc(W*H,bytes);if(!packed)return NULL;
+ uint32_t red[256],green[256],blue[256],alpha=channel(255,v->transp);int columns[W],rows[H];
+ for(unsigned i=0;i<256;i++){
+  unsigned level=(unsigned)(i*opacity);
+  red[i]=channel(level,v->red);green[i]=channel(level,v->green);blue[i]=channel(level,v->blue);
+ }
+ for(int x=0;x<W;x++)columns[x]=(int)((x-W/2)/scale+W/2);
+ for(int y=0;y<H;y++)rows[y]=(int)((y-H/2)/scale+H/2);
  for(int y=0;y<H;y++)for(int x=0;x<W;x++){
-  int sx=(int)((x-W/2)/scale+W/2),sy=(int)((y-H/2)/scale+H/2);uint32_t rgb=0;
+  int sx=columns[x],sy=rows[y];uint32_t rgb=0;
   if(sx>=0&&sx<W&&sy>=0&&sy<H)rgb=src[sy*W+sx];
-  unsigned red=(unsigned)(((rgb>>16)&255)*opacity),green=(unsigned)(((rgb>>8)&255)*opacity),blue=(unsigned)((rgb&255)*opacity);
-  uint32_t pixel=channel(red,v->red)|channel(green,v->green)|channel(blue,v->blue)|channel(255,v->transp);
+  uint32_t pixel=red[(rgb>>16)&255]|green[(rgb>>8)&255]|blue[rgb&255]|alpha;
   memcpy(packed+((size_t)y*W+x)*bytes,&pixel,bytes);
  }
  return packed;
 }
+static void frame_point(unsigned angle,int width,int height,int x,int y,int *px,int *py) {
+ int rw=(angle==90||angle==270)?H:W,rh=(angle==90||angle==270)?W:H;
+ int ox=(width-rw)/2,oy=(height-rh)/2;
+ switch(angle){
+  case 90: *px=ox+H-1-y;*py=oy+x;break;
+  case 180:*px=ox+W-1-x;*py=oy+H-1-y;break;
+  case 270:*px=ox+y;*py=oy+W-1-x;break;
+  default:*px=ox+x;*py=oy+y;break;
+ }
+}
 static void present(uint8_t *fb,const struct fb_fix_screeninfo *fix,const struct fb_var_screeninfo *v,const uint8_t *packed) {
  unsigned bytes=v->bits_per_pixel/8;int px=((int)v->xres-W)/2,py=((int)v->yres-H)/2;
- if(rotate270){
-  int ox=((int)v->xres-H)/2,oy=((int)v->yres-W)/2;
+ if(rotation){
   for(int y=0;y<H;y++)for(int x=0;x<W;x++){
-   size_t offset=(size_t)(oy+W-1-x+v->yoffset)*fix->line_length+(ox+y+v->xoffset)*bytes;
+   int tx,ty;frame_point(rotation,v->xres,v->yres,x,y,&tx,&ty);
+   size_t offset=(size_t)(ty+v->yoffset)*fix->line_length+(tx+v->xoffset)*bytes;
    if(offset+bytes<=fix->smem_len)memcpy(fb+offset,packed+((size_t)y*W+x)*bytes,bytes);
   }
   return;
@@ -107,44 +128,57 @@ static void present(uint8_t *fb,const struct fb_fix_screeninfo *fix,const struct
  }
 }
 static void hold_progress(uint8_t *fb,const struct fb_fix_screeninfo *fix,const struct fb_var_screeninfo *v,double progress) {
- unsigned bytes=v->bits_per_pixel/8;int ox=((int)v->xres-W)/2,oy=((int)v->yres-H)/2;
+ unsigned bytes=v->bits_per_pixel/8;
  for(int y=490;y<494;y++)for(int x=W/2-96;x<W/2+96;x++){
   unsigned level=(x-W/2+96)<192*progress?215:24;
   if(progress<0)level=0;
   uint32_t pixel=channel(level,v->red)|channel(level,v->green)|channel(level,v->blue)|channel(255,v->transp);
-  int px=ox+x,py=oy+y;
-  if(rotate270){px=((int)v->xres-H)/2+y;py=((int)v->yres-W)/2+W-1-x;}
+  int px,py;frame_point(rotation,v->xres,v->yres,x,y,&px,&py);
   size_t offset=(size_t)(py+v->yoffset)*fix->line_length+(px+v->xoffset)*bytes;
   if(offset+bytes<=fix->smem_len)memcpy(fb+offset,&pixel,bytes);
  }
 }
-struct frames {uint8_t *entry[15],*pulse[24],*exit[15],*base;};
+struct frames {uint8_t *entry[15],*pulse[24],*exit[15],*base;cairo_surface_t *surface;unsigned prepared;};
 static void free_frames(struct frames *f) {
- for(int i=0;i<15;i++){free(f->entry[i]);free(f->exit[i]);}for(int i=0;i<24;i++)free(f->pulse[i]);free(f->base);memset(f,0,sizeof(*f));
+ for(int i=0;i<15;i++){free(f->entry[i]);free(f->exit[i]);}for(int i=0;i<24;i++)free(f->pulse[i]);
+ free(f->base);if(f->surface)cairo_surface_destroy(f->surface);memset(f,0,sizeof(*f));
 }
-static bool cache_frames(struct frames *f,const struct fb_var_screeninfo *v,int percent,bool online,bool reduced) {
- free_frames(f);cairo_surface_t *s=render(percent,online,0);f->base=pack(v,s,1,1);
- for(int i=0;i<15;i++){
-  double e=bezier(i/14.);f->entry[i]=pack(v,s,e,reduced?1:.95+.05*e);f->exit[i]=pack(v,s,1-e,1);
+static bool cache_frames(struct frames *f,const struct fb_var_screeninfo *v,int percent,bool online) {
+ free_frames(f);f->surface=render(percent,online,0);f->base=pack(v,f->surface,1,1);
+ return f->base!=NULL;
+}
+static bool prepare_frame(struct frames *f,const struct fb_var_screeninfo *v,int percent,bool online,bool reduced) {
+ /* One frame per event-loop iteration: never hide cable/key events behind
+  * a synchronous 55-frame cache rebuild on the powersave CPU governor. */
+ unsigned index=f->prepared;uint8_t **target;
+ if(index>=54)return true;
+ if(index<15){double e=bezier(index/14.);target=&f->entry[index];*target=pack(v,f->surface,e,reduced?1:.95+.05*e);}
+ else if(index<30){double e=bezier((index-15)/14.);target=&f->exit[index-15];*target=pack(v,f->surface,1-e,1);}
+ else {unsigned phase=index-30;target=&f->pulse[phase];
+  cairo_surface_t *s=render(percent,online,reduced?0:(1-cos(phase*2*M_PI/24))/2);
+  *target=pack(v,s,1,1);cairo_surface_destroy(s);
  }
- cairo_surface_destroy(s);
- for(int i=0;i<24;i++){s=render(percent,online,reduced?0:(1-cos(i*2*M_PI/24))/2);f->pulse[i]=pack(v,s,1,1);cairo_surface_destroy(s);}
- if(!f->base)return false;
- for(int i=0;i<15;i++)if(!f->entry[i]||!f->exit[i])return false;
- for(int i=0;i<24;i++)if(!f->pulse[i])return false;
- return true;
+ if(!*target)return false;
+ f->prepared++;return true;
 }
 int main(int argc,char **argv) {
  if(argc==3&&!strcmp(argv[1],"--snapshot")){
   cairo_surface_t *s=render(67,true,.5);int code=cairo_surface_write_to_png(s,argv[2]);cairo_surface_destroy(s);return code!=CAIRO_STATUS_SUCCESS;
  }
  bool preview=argc==2&&!strcmp(argv[1],"--preview"),live=argc==2&&!strcmp(argv[1],"--live");
- rotate270=getenv("MOCHA_CHARGER_TRANSFORM")&&!strcmp(getenv("MOCHA_CHARGER_TRANSFORM"),"270");
+ const char *angle=getenv("MOCHA_CHARGER_TRANSFORM");
+ if(angle){
+  if(!strcmp(angle,"90"))rotation=90;
+  else if(!strcmp(angle,"180"))rotation=180;
+  else if(!strcmp(angle,"270"))rotation=270;
+  else if(strcmp(angle,"0")){fprintf(stderr,"unsupported charger transform\n");return 2;}
+ }
  bool reduced=getenv("MOCHA_REDUCED_MOTION")&&!strcmp(getenv("MOCHA_REDUCED_MOTION"),"1");
  if(!preview&&!live){fprintf(stderr,"usage: %s --snapshot FILE | --preview | --live\n",argv[0]);return 2;}
  int fbfd=open("/dev/fb0",O_RDWR|O_CLOEXEC);struct fb_fix_screeninfo fix;struct fb_var_screeninfo v;
  if(fbfd<0||ioctl(fbfd,FBIOGET_FSCREENINFO,&fix)||ioctl(fbfd,FBIOGET_VSCREENINFO,&v)){perror("framebuffer");return 2;}
- if((v.bits_per_pixel!=16&&v.bits_per_pixel!=32)||v.xres<(rotate270?H:W)||v.yres<(rotate270?W:H)){fprintf(stderr,"unsupported framebuffer\n");return 2;}
+ bool sideways=rotation==90||rotation==270;
+ if((v.bits_per_pixel!=16&&v.bits_per_pixel!=32)||v.xres<(sideways?H:W)||v.yres<(sideways?W:H)){fprintf(stderr,"unsupported framebuffer\n");return 2;}
  uint8_t *fb=mmap(NULL,fix.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,fbfd,0);
  if(fb==MAP_FAILED){perror("framebuffer map");return 2;}
  uint8_t *saved=NULL;if(preview){saved=malloc(fix.smem_len);if(!saved)return 2;memcpy(saved,fb,fix.smem_len);}
@@ -161,6 +195,12 @@ int main(int argc,char **argv) {
    if(fd>=0&&ioctl(fd,EVIOCGNAME(sizeof(name)),name)>=0&&!strcmp(name,"gpio-keys")){input=fd;break;}if(fd>=0)close(fd);
   }globfree(&inputs);
  }
+ if(live&&power_held(input)&&read_int(capacity,-1)>=5){
+  if(brightness)write_int(brightness,old_brightness);
+  if(tty>=0){ioctl(tty,KDSETMODE,old_mode);close(tty);}
+  close(input);globfree(&backlights);munmap(fb,fix.smem_len);close(fbfd);
+  fprintf(stderr,"CHARGER_UI_EXIT=10 initial_power_held=1\n");return 10;
+ }
  signal(SIGINT,interrupted);signal(SIGTERM,interrupted);
  memset(fb,0,fix.smem_len);double started=now(),shown=started,hide_at=started+15,next_status=0,pressed=0,offline=0,next_frame=started,reveal_at=0;
  int reveal_from=0;
@@ -169,13 +209,26 @@ int main(int argc,char **argv) {
  while(!stop){
   double t=now();if(preview&&t-started>8)break;
   if(t>=next_status){percent=read_int(capacity,-1);online=read_int(charger,0)>0;
-   net_charging=read_int("/sys/class/power_supply/bq27520g4-0/current_now",-1)>0;next_status=t+1;
+   net_charging=read_int("/sys/class/power_supply/bq27520g4-0/current_now",-1)>0;next_status=t+.25;
+   bool reconnected=online&&offline;
    if(!online){if(!offline)offline=t;}else offline=0;
    if(live&&offline&&t-offline>8){result=20;break;}
-   if(!cached.base||percent!=last_percent||online!=last_online||net_charging!=last_charging){
-    if(!cache_frames(&cached,&v,percent,online,reduced)){result=2;break;}
+   if(live&&reconnected){
+    /* A cable insertion must reveal the charge UI even after its timeout. */
+    shown=t;hide_at=t+15;next_frame=t;reveal_at=0;blank=false;last_frame=NULL;
+    memset(fb,0,fix.smem_len);if(brightness)write_int(brightness,60);
+   }
+   if(!blank&&(!cached.base||percent!=last_percent||online!=last_online||net_charging!=last_charging)){
+    double cache_started=now();
+    if(!cache_frames(&cached,&v,percent,online)){result=2;break;}
+    if(frames==0){
+     present(fb,&fix,&v,cached.base);frames++;
+     fprintf(stderr,"CHARGER_UI_FIRST_PAINT_MS=%.0f\n",(now()-started)*1000);
+    }
+    fprintf(stderr,"CHARGER_UI_BASE_MS=%.0f\n",(now()-cache_started)*1000);
     last_frame=NULL;last_percent=percent;last_online=online;last_charging=net_charging;
-    if(frames==0){shown=now();started=shown;next_frame=shown;hide_at=shown+15;}
+    if(frames==1){shown=now()-.24;next_frame=now();hide_at=now()+15;}
+    t=now();
    }
   }
   if(input>=0){struct input_event event;
@@ -192,11 +245,13 @@ int main(int argc,char **argv) {
   double age=t-shown;
   if(live&&t>=hide_at&&!blank){if(brightness)write_int(brightness,0);memset(fb,0,fix.smem_len);blank=true;}
   if(!blank){
+   if(!prepare_frame(&cached,&v,percent,online,reduced)){result=2;break;}
    const uint8_t *frame=cached.base;
    if(age<.24)frame=cached.entry[(int)fmax(0,fmin(14,age/.24*14))];
    else if(!reduced&&age<6)frame=cached.pulse[(int)(age/2.8*24)%24];
    if(live&&t>hide_at-.24)frame=cached.exit[(int)fmin(14,(t-hide_at+.24)/.24*14)];
    else if(reveal_at&&t-reveal_at<.2)frame=cached.exit[(int)(reveal_from*(1-bezier((t-reveal_at)/.2)))];
+   if(!frame)frame=cached.base;
    if(frame!=last_frame){present(fb,&fix,&v,frame);last_frame=frame;frames++;}
    hold_progress(fb,&fix,&v,pressed?fmin(1,(t-pressed)/2):-1);
   }
