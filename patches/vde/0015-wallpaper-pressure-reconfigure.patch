@@ -1,0 +1,25 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -459,7 +459,11 @@
+   local generation = nextGeneration(connector)
+   if pressureActive then
+     local paused = isPaused[connector] == true
+-    pressureReleased[connector] = { path = path, wasPaused = paused }
++    local released = pressureReleased[connector]
++    if not released or released.path ~= path then
++      released = { path = path, wasPaused = paused }
++    end
++    pressureReleased[connector] = released
+     killMpvpaper(connector, function()
+       if currentSelection(connector, path, generation) then
+         forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
+@@ -727,7 +731,8 @@
+   local reason = available and available < low and "memory" or
+     (memory and memory >= 5 and "memory-stall" or "cpu-stall")
+   local recovered = available and available >= high and
+-      (not memory or memory < 1) and (not cpu or cpu < 25)
++      (not memory or memory < 1) and
++      (cfg("pause_on_cpu_pressure") ~= true or not cpu or cpu < 25)
+   if bad then
+     pressureBadSince = pressureBadSince or now
+     pressureGoodSince = nil

@@ -1,0 +1,11 @@
+--- a/config/noctalia/mpv-hook.lua
++++ b/config/noctalia/mpv-hook.lua
+@@ -84,7 +84,7 @@
+     msg.info("Syncing wallpaper colors for: " .. path)
+     
+     -- Run asynchronously
+-    mp.commandv("run", "sh", "-c", cmd)
++    mp.commandv("run", "env", "-u", "LD_LIBRARY_PATH", "sh", "-c", cmd)
+ end
+ 
+ mp.register_event("file-loaded", on_file_loaded)

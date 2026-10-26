@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-17",
+  "deployment": "RAM kernel vde1 with controls development module; standalone mpvpaper trial, official plugin not yet qualified",
+  "player_build": {
+    "source_sha256": "6de941b54941cfd5d00bac62d10ef47c1338f237dac4c78a7185d0f8d30cd4d1",
+    "patch_sha256": "573f519fef52df896a83b1a38a50cc61c46f5d88d13995ba3022106b52657ff8",
+    "files": {
+      "mpvpaper": "41111c6ea2d1a7364c809ddc83d762836cc21408b829f452b634634f8c429da3",
+      "mpvpaper-holder": "e61e476ea0a72d8ee495ec2abba61a0b66fb8780a5dc46a9cb9521ef5fa3265b"
+    }
+  },
+  "video": {
+    "width": 1536,
+    "height": 1086,
+    "fps": 30,
+    "codec": "H.264 progressive CAVLC",
+    "private_media_not_published": true
+  },
+  "ui": {
+    "panel_cycles": 3,
+    "overview_cycles": 3,
+    "seconds": 14.034765600001265,
+    "all_running_hardware_unpaused": true,
+    "decoder_drops": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "vo_drops": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "player_cpu_percent_one_core": 23.726794553659662,
+    "whole_system_busy_percent": 39.853613906678866
+  },
+  "fullscreen": [
+    {
+      "cycle": 0,
+      "before_rss_kib": 48152,
+      "holder_rss_kib": 1312,
+      "holder_video_fds": 0,
+      "holder_dma_buf_fds": 0,
+      "module_refs": "0",
+      "runtime_status": "suspended",
+      "resumed_hwdec": "v4l2request",
+      "resumed_time_pos": 10.9,
+      "resumed_vo_drop_count": 19
+    },
+    {
+      "cycle": 1,
+      "before_rss_kib": 47868,
+      "holder_rss_kib": 1312,
+      "holder_video_fds": 0,
+      "holder_dma_buf_fds": 0,
+      "module_refs": "0",
+      "runtime_status": "suspended",
+      "resumed_hwdec": "v4l2request",
+      "resumed_time_pos": 12.233333,
+      "resumed_vo_drop_count": 0
+    },
+    {
+      "cycle": 2,
+      "before_rss_kib": 47928,
+      "holder_rss_kib": 1312,
+      "holder_video_fds": 0,
+      "holder_dma_buf_fds": 0,
+      "module_refs": "0",
+      "runtime_status": "suspended",
+      "resumed_hwdec": "v4l2request",
+      "resumed_time_pos": 13.133333,
+      "resumed_vo_drop_count": 0
+    }
+  ],
+  "limits": [
+    "Standalone trial layer is bottom; production plugin wiring not yet validated",
+    "Transient VO drops were recorded around terminal/fullscreen transitions; do not report all display phases as drop-free",
+    "Player CPU excludes kernel decoder workers and compositor",
+    "The kernel still performs CPU detiling before DMA-BUF display",
+    "Fresh full kernel cold boot and lock lifecycle remain pending"
+  ]
+}

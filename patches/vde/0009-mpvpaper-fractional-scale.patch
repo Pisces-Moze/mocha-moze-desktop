@@ -1,0 +1,198 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,4 +1,5 @@
+ #include <errno.h>
++#include <limits.h>
+ #include <fcntl.h>
+ #include <getopt.h>
+ #include <poll.h>
+@@ -14,6 +15,8 @@
+ 
+ #include "wlr-layer-shell-unstable-v1-client-protocol.h"
+ #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
++#include "fractional-scale-v1-client-protocol.h"
++#include "viewporter-client-protocol.h"
+ #include <wayland-client.h>
+ #include <wayland-egl.h>
+ 
+@@ -31,6 +34,8 @@
+     struct wl_display *display;
+     struct wl_compositor *compositor;
+     struct zwlr_layer_shell_v1 *layer_shell;
++    struct wp_viewporter *viewporter;
++    struct wp_fractional_scale_manager_v1 *fractional_manager;
+     struct wl_list outputs; // struct display_output::link
+     struct wl_list toplevel_handles;
+     char *monitor; // User selected output
+@@ -51,6 +56,10 @@
+ 
+     uint32_t width, height;
+     uint32_t scale;
++    uint32_t preferred_scale; /* denominator 120 */
++    uint32_t buffer_width, buffer_height;
++    struct wp_fractional_scale_v1 *fractional_scale;
++    struct wp_viewport *viewport;
+ 
+     struct wl_list link;
+ 
+@@ -158,12 +167,56 @@
+ 
+ const static struct wl_callback_listener wl_surface_frame_listener;
+ 
++/* Layer-shell dimensions are logical. Do not round a 1.5 scale up to
++ * a 2x framebuffer and then make the compositor downsample it again.
++ * Buffer scale remains one when wp_viewport maps fractional pixel sizes.
++ */
++static void update_output_size(struct display_output *output) {
++    if (!output->surface || !output->width || !output->height)
++        return;
++    uint64_t scale = output->fractional_scale ? output->preferred_scale : output->scale * 120u;
++    uint64_t width = ((uint64_t)output->width * scale + 60u) / 120u;
++    uint64_t height = ((uint64_t)output->height * scale + 60u) / 120u;
++    if (!width || !height || width > INT_MAX || height > INT_MAX ||
++            output->width > INT_MAX || output->height > INT_MAX) {
++        cflp_error("Invalid scaled wallpaper dimensions");
++        exit_mpvpaper(EXIT_FAILURE);
++    }
++    output->buffer_width = width;
++    output->buffer_height = height;
++    if (output->viewport) {
++        wl_surface_set_buffer_scale(output->surface, 1);
++        wp_viewport_set_destination(output->viewport, output->width, output->height);
++    } else {
++        wl_surface_set_buffer_scale(output->surface, output->scale);
++    }
++    if (output->egl_window)
++        wl_egl_window_resize(output->egl_window, width, height, 0, 0);
++    output->redraw_needed = true;
++    if (VERBOSE)
++        cflp_info("Output %s framebuffer %ux%u logical %ux%u scale %u/120",
++                  output->name, output->buffer_width, output->buffer_height,
++                  output->width, output->height, (uint)scale);
++}
++
++static void preferred_scale(void *data, struct wp_fractional_scale_v1 *object, uint32_t scale) {
++    (void)object;
++    struct display_output *output = data;
++    if (!scale || scale > 120u * 16u) return;
++    output->preferred_scale = scale;
++    update_output_size(output);
++}
++
++static const struct wp_fractional_scale_v1_listener fractional_listener = {
++    .preferred_scale = preferred_scale,
++};
++
+ static void render(struct display_output *output) {
+     mpv_render_param render_params[] = {
+         {MPV_RENDER_PARAM_OPENGL_FBO, &(mpv_opengl_fbo) {
+             .fbo = 0,
+-            .w = output->width * output->scale,
+-            .h = output->height * output->scale,
++            .w = output->buffer_width,
++            .h = output->buffer_height,
+         }},
+         // Flip rendering (needed due to flipped GL coordinate system).
+         {MPV_RENDER_PARAM_FLIP_Y, &(int){1}},
+@@ -175,7 +228,7 @@
+     if (!eglMakeCurrent(egl_display, output->egl_surface, output->egl_surface, egl_context))
+         cflp_error("Failed to make output surface current %s", eglGetErrorString(eglGetError()));
+ 
+-    glViewport(0, 0, output->width * output->scale, output->height * output->scale);
++    glViewport(0, 0, output->buffer_width, output->buffer_height);
+ 
+     // Render frame
+     int mpv_err = mpv_render_context_render(mpv_glcontext, render_params);
+@@ -848,6 +901,10 @@
+         wl_egl_window_destroy(output->egl_window);
+     if (output->layer_surface != NULL)
+         zwlr_layer_surface_v1_destroy(output->layer_surface);
++    if (output->fractional_scale)
++        wp_fractional_scale_v1_destroy(output->fractional_scale);
++    if (output->viewport)
++        wp_viewport_destroy(output->viewport);
+     if (output->surface != NULL)
+         wl_surface_destroy(output->surface);
+     if (output->frame_callback)
+@@ -866,14 +923,14 @@
+     output->width = width;
+     output->height = height;
+     zwlr_layer_surface_v1_ack_configure(surface, serial);
+-    wl_surface_set_buffer_scale(output->surface, output->scale);
++    update_output_size(output);
+ 
+     // Ignore bad surfaces
+     if (width == 0 || height == 0) return;
+ 
+     if (!output->egl_window) {
+-        output->egl_window = wl_egl_window_create(output->surface, output->width * output->scale,
+-                output->height * output->scale);
++        output->egl_window = wl_egl_window_create(output->surface, output->buffer_width,
++                output->buffer_height);
+         output->egl_surface = eglCreatePlatformWindowSurface(egl_display, egl_config, output->egl_window, NULL);
+         if (!output->egl_surface) {
+             cflp_error("Failed to create EGL surface for %s %s", output->name, eglGetErrorString(eglGetError()));
+@@ -895,7 +952,7 @@
+         // Start render loop
+         render(output);
+     } else {
+-        wl_egl_window_resize(output->egl_window, output->width * output->scale, output->height * output->scale, 0, 0);
++        wl_egl_window_resize(output->egl_window, output->buffer_width, output->buffer_height, 0, 0);
+     }
+ }
+ 
+@@ -915,6 +972,14 @@
+ 
+ static void create_layer_surface(struct display_output *output) {
+     output->surface = wl_compositor_create_surface(output->state->compositor);
++    if (output->state->viewporter && output->state->fractional_manager &&
++            !getenv("MOCHA_PAPER_INTEGER_SCALE")) {
++        output->viewport = wp_viewporter_get_viewport(output->state->viewporter, output->surface);
++        output->preferred_scale = output->scale * 120u;
++        output->fractional_scale = wp_fractional_scale_manager_v1_get_fractional_scale(
++            output->state->fractional_manager, output->surface);
++        wp_fractional_scale_v1_add_listener(output->fractional_scale, &fractional_listener, output);
++    }
+ 
+     // Empty input region
+     struct wl_region *input_region = wl_compositor_create_region(output->state->compositor);
+@@ -988,7 +1053,9 @@
+     (void)wl_output;
+ 
+     struct display_output *output = data;
++    if (scale <= 0 || scale > 16) return;
+     output->scale = scale;
++    if (!output->fractional_scale) update_output_size(output);
+ }
+ 
+ static void output_name(void *data, struct wl_output *wl_output, const char *name) {
+@@ -1046,6 +1113,10 @@
+         wl_output_add_listener(output->wl_output, &output_listener, output);
+         wl_list_insert(&state->outputs, &output->link);
+ 
++    } else if (strcmp(interface, wp_viewporter_interface.name) == 0) {
++        state->viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
++    } else if (strcmp(interface, wp_fractional_scale_manager_v1_interface.name) == 0) {
++        state->fractional_manager = wl_registry_bind(registry, name, &wp_fractional_scale_manager_v1_interface, 1);
+     } else if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
+         state->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
+     }
+--- a/meson.build
++++ b/meson.build
+@@ -14,12 +14,16 @@
+ scanner_client_header=generator(scanner,output: '@BASENAME@-client-protocol.h',arguments: ['client-header','@INPUT@','@OUTPUT@'])
+ 
+ protocols_src=[
++  scanner_private_code.process(wl_protocols.get_variable('pkgdatadir')+'/staging/fractional-scale/fractional-scale-v1.xml'),
++  scanner_private_code.process(wl_protocols.get_variable('pkgdatadir')+'/stable/viewporter/viewporter.xml'),
+   scanner_private_code.process('proto/wlr-layer-shell-unstable-v1.xml'),
+   scanner_private_code.process('proto/wlr-foreign-toplevel-management-unstable-v1.xml'),
+   scanner_private_code.process(wl_protocols.get_variable('pkgdatadir')+'/stable/xdg-shell/xdg-shell.xml')
+ ]
+ 
+ protocols_headers=[
++  scanner_client_header.process(wl_protocols.get_variable('pkgdatadir')+'/staging/fractional-scale/fractional-scale-v1.xml'),
++  scanner_client_header.process(wl_protocols.get_variable('pkgdatadir')+'/stable/viewporter/viewporter.xml'),
+   scanner_client_header.process('proto/wlr-layer-shell-unstable-v1.xml'),
+   scanner_client_header.process('proto/wlr-foreign-toplevel-management-unstable-v1.xml')
+ ]

@@ -1,0 +1,43 @@
+--- a/src/shell/desktop/widgets/desktop_fancy_audio_visualizer_widget.cpp
++++ b/src/shell/desktop/widgets/desktop_fancy_audio_visualizer_widget.cpp
+@@ -194,8 +194,10 @@
+ 
+   applyVisibility();
+   ensureSpectrumTexture(renderer);
++  // A final silent spectrum update can arrive after the widget fades out.
++  // Consume it while hidden too, or the pending flag requests frames forever.
++  syncSpectrum(renderer);
+   if (m_visible) {
+-    syncSpectrum(renderer);
+     if (shouldAnimateTime()) {
+       m_shaderTime = std::fmod(m_shaderTime + std::max(0.0F, deltaMs) * 0.001F, 3600.0F);
+       m_visualizer->setTime(m_shaderTime);
+--- a/src/shell/desktop/widgets/desktop_audio_visualizer_widget.cpp
++++ b/src/shell/desktop/widgets/desktop_audio_visualizer_widget.cpp
+@@ -143,10 +143,11 @@
+     return;
+   }
+   applyVisibility();
++  // Drain the final silent update even after visibility has collapsed.
++  syncSpectrum(&renderer);
+   if (!m_visible) {
+     return;
+   }
+-  syncSpectrum(&renderer);
+   m_visualizer->tick(deltaMs);
+ }
+ 
+@@ -198,11 +199,13 @@
+ 
+ void DesktopAudioVisualizerWidget::pullSpectrumValues() {
+   if (m_visualizer == nullptr || m_spectrum == nullptr || m_listenerId == 0) {
++    m_pendingSpectrumUpdate = false;
+     return;
+   }
+ 
+   const auto& spectrumValues = m_spectrum->values(m_listenerId);
+   if (spectrumValues.empty()) {
++    m_pendingSpectrumUpdate = false;
+     return;
+   }
+ 

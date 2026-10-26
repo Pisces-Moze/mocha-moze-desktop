@@ -1,0 +1,53 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -723,9 +723,9 @@
+   end
+ end
+ 
+--- The compositor publishes transitions after its X-Ray-aware visibility pass.
+--- Unknown/stale sessions fail open. No geometric guesses, shell commands or
+--- additional polling processes are needed for this policy.
++-- The compositor publishes actual visibility and settled workspace coverage.
++-- Covered translucent windows retain the cached wallpaper as their backdrop.
++-- Unknown/stale sessions fail open; use the existing 1 Hz service update.
+ local function updateCoverage(now)
+   local socket = noctalia.getenv("NIRI_SOCKET") or ""
+   local pid = socket:match("%.(%d+)%.sock$")
+@@ -738,8 +738,9 @@
+     local text = noctalia.readFile(runtime .. "/mocha-niri-background-" .. pid .. "-" .. encoded .. ".json")
+     if type(text) ~= "string" then return false end
+     local ok, data = pcall(noctalia.json.decode, text)
+-    return ok and type(data) == "table" and data.schema == 1 and data.pid == tonumber(pid) and
+-      data.output == name and data.visible == false and data.overview ~= true and data.shell_overlay ~= true
++    return ok and type(data) == "table" and (data.schema == 1 or data.schema == 2) and data.pid == tonumber(pid) and
++      data.output == name and (data.visible == false or (data.schema == 2 and data.workarea_covered == true)) and
++      data.overview ~= true and data.shell_overlay ~= true
+   end
+   local changed = false
+   for connector in pairs(assignments) do
+--- a/translations/en.json
++++ b/translations/en.json
+@@ -94,8 +94,8 @@
+       "description": "Wait for stable recovery to avoid repeated stop/start cycles."
+     },
+     "release_when_covered": {
+-      "label": "Release fully hidden wallpaper",
+-      "description": "Use compositor visibility, preserving transparent and blurred backgrounds; keep playing during overview and shell panels."
++      "label": "Release wallpaper behind a covered workspace",
++      "description": "Release when windows cover the workspace, including small tiling gaps. Keep the cached backdrop and blur; overview and panels keep playing."
+     },
+     "covered_hold_seconds": {
+       "label": "Full occlusion hold (seconds)",
+--- a/translations/zh-Hans.json
++++ b/translations/zh-Hans.json
+@@ -94,8 +94,8 @@
+       "description": "资源稳定充足后再恢复，避免反复启停。"
+     },
+     "release_when_covered": {
+-      "label": "壁纸完全不可见时释放资源",
+-      "description": "依据合成器实际可见性；保留透明和毛玻璃背景，概览和顶部面板期间继续播放。"
++      "label": "窗口覆盖工作区时释放壁纸资源",
++      "description": "窗口覆盖工作区时释放资源，容纳小幅平铺间隙。保留缓存背景和毛玻璃效果，概览和顶部面板期间继续播放。"
+     },
+     "covered_hold_seconds": {
+       "label": "完全遮挡等待（秒）",

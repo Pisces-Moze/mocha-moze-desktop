@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-18",
+  "kernelrelease": "6.12.111-moze.1-native-vde2",
+  "browser": "Firefox ESR 153.4.0",
+  "session": "real Wayland window; isolated diagnostic profile; inherited desktop Mesa environment",
+  "headless": false,
+  "production_profile_modified": false,
+  "automation_recommended_preferences": false,
+  "window_protocol": "wayland",
+  "window_layer_manager": "WebRender",
+  "accelerated_windows": 1,
+  "total_windows": 1,
+  "driver_vendor": "mesa/tegra",
+  "driver_version": "25.0.7.0",
+  "webgl1_renderer": "NVIDIA -- tegra",
+  "webgl2_renderer": "NVIDIA -- tegra",
+  "hardware_video_decoding": "unavailable",
+  "hardware_video_failure_id": "FEATURE_FAILURE_VIDEO_DECODING_TEST_FAILED",
+  "force_enabled_blocklisted_features": false,
+  "limits": [
+    "This verifies graphics initialization in the diagnostic profile, not arbitrary web-page performance.",
+    "MPV V4L2 Request hardware decode is not a Firefox video-decoding backend.",
+    "WebRender native compositor and WebGL DMA-BUF surface export remain blocklisted; they were not forced on."
+  ]
+}

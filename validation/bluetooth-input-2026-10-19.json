@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-19",
+  "patch": "0019-noctalia-bluetooth-agent-lifecycle.patch",
+  "build": "incremental ARM cross-build from exact predecessor source and build output",
+  "previous_binary_sha256": "6fcae5dea141cab54c7fbb2f605a8dde9eccca4fbba967457aecab47e92fdc22",
+  "installed_binary_sha256": "6d0d3af9fc27fef489932b154a88c60311cdfda3d8a847c32b7970164e3cf781",
+  "config_validation": true,
+  "atomic_install_with_backup": true,
+  "only_shell_restarted": true,
+  "live_binary_and_unlocked_status_verified": true,
+  "bluez_restart_reregistration_live_test": "not performed",
+  "k480_end_to_end_pairing": "user entered code and manually connected before completion fix; binding retained",
+  "actual_mouse_motion_click_wheel": "pending user acceptance",
+  "patches": [
+    "0019-noctalia-bluetooth-agent-lifecycle.patch",
+    "0020-noctalia-bluetooth-pair-completion.patch"
+  ],
+  "real_pairing_callback_regression_passed": true,
+  "public_patches_match_final_source": true,
+  "k480_paired_bonded_trusted_connected_services_resolved": true,
+  "k480_kernel_input_node_present": true,
+  "fresh_pair_after_completion_fix": "not repeated",
+  "ordinary_typing": "not separately confirmed"
+}

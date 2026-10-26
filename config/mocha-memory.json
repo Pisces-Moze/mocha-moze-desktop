@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "grace_seconds": 60,
+  "pressure_grace_seconds": 15,
+  "low_memory_mib": 320,
+  "opaque_maximized": true,
+  "exclude_app_ids": []
+}

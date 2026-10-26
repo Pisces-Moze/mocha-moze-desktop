@@ -1,0 +1,85 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -230,7 +230,10 @@
+     const char *playlist_pos = mpv_get_property_string(mpv, "playlist-pos");
+ 
+     char save_info[30];
+-    snprintf(save_info, sizeof(save_info), "%s %s", time_pos, playlist_pos);
++    snprintf(save_info, sizeof(save_info), "%s %s",
++             time_pos ? time_pos : "0", playlist_pos ? playlist_pos : "0");
++    mpv_free((void *)time_pos);
++    mpv_free((void *)playlist_pos);
+ 
+     char **new_argv = calloc(halt_info.argc + 3, sizeof(char *)); // Plus 3 for adding in -Z
+     if (!new_argv) {
+@@ -456,10 +459,10 @@
+     id++;
+ 
+     // Thread for monitoring if mpvpaper is hidden
+-    if (halt_info.auto_pause) {
++    if (halt_info.auto_pause && halt_info.auto_pause != 2) {
+         pthread_create(&threads[id], NULL, handle_auto_pause, NULL);
+         id++;
+-    } else if (halt_info.auto_stop) {
++    } else if (halt_info.auto_stop && halt_info.auto_stop != 2) {
+         pthread_create(&threads[id], NULL, handle_auto_stop, NULL);
+         id++;
+     }
+@@ -770,18 +773,25 @@
+ 
+     uint32_t *s;
+     bool currently_blocking = false;
++    bool activated = false;
+ 
+     wl_array_for_each(s, state) {
++        if (*s == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
++            activated = true;
+         if (*s == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_FULLSCREEN) {
+             currently_blocking = true;
+-            break;
+         } else if (*s == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED) {
+             if (halt_info.auto_pause > 2 || halt_info.auto_stop > 2) {
+                 currently_blocking = true;
+-                break;
+             }
+         }
+     }
++
++    /* FULL is driven only by a focused fullscreen toplevel, never by
++     * frame callback delays from a panel, overview or an inactive workspace.
++     */
++    if ((halt_info.auto_pause == 2 || halt_info.auto_stop == 2) && !activated)
++        currently_blocking = false;
+ 
+     check_handle_blocking(handle_state, wl_state, currently_blocking);
+ }
+--- a/src/holder.c
++++ b/src/holder.c
+@@ -189,18 +189,25 @@
+ 
+     uint32_t *s;
+     bool currently_blocking = false;
++    bool activated = false;
+ 
+     wl_array_for_each(s, state) {
++        if (*s == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
++            activated = true;
+         if (*s == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_FULLSCREEN) {
+             currently_blocking = true;
+-            break;
+         } else if (*s == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED) {
+             if (halt_info.auto_stop > 2) {
+                 currently_blocking = true;
+-                break;
+             }
+         }
+     }
++
++    /* FULL is driven only by a focused fullscreen toplevel, never by
++     * frame callback delays from a panel, overview or an inactive workspace.
++     */
++    if (halt_info.auto_stop == 2 && !activated)
++        currently_blocking = false;
+ 
+     check_handle_blocking(handle_state, wl_state, currently_blocking);
+ }

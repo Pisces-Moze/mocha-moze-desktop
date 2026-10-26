@@ -19,6 +19,19 @@ import time
 PIN = "ebafe03c9bdf1291eeb83d0f8c368d40a63ccdfd"
 
 
+def adapt_panel_namespaces(text):
+    # Noctalia 5 uses these namespaces instead of the old Nyxuri shell names.
+    # Preserve the upstream panel effect policy: missing the match silently
+    # selects Niri's default X-Ray path, blurring the whole live wallpaper.
+    old = 'match namespace="^(nyxuri|clavis)-shell-"'
+    new = 'match namespace="^((nyxuri|clavis)-shell-|noctalia-(panel|osd)$)"'
+    if new in text:
+        return text
+    if text.count(old) != 1:
+        raise ValueError("Pinned Nyxuri panel rule changed; review namespace mapping")
+    return text.replace(old, new)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
@@ -53,6 +66,8 @@ def main():
                     continue
                 path.write_text(text.replace("/home/user", str(home)), encoding="utf-8", newline="\n")
         niri = content_dir / "niri"
+        rules_file = niri / "rules.kdl"
+        rules_file.write_text(adapt_panel_namespaces(rules_file.read_text()))
         main_config = (niri / "config.kdl").read_text()
         main_config = main_config.replace('    honor-xdg-activation-with-invalid-serial',
             '    honor-xdg-activation-with-invalid-serial\n    render-drm-device "/dev/dri/renderD128"')
@@ -175,6 +190,8 @@ def main():
         from nyxuri.modules.gtktheme import gtktheme_install
         if not fcitx_install() or not gtktheme_install():
             raise RuntimeError(f"Theme module installation failed; backup: {backup}")
+        subprocess.run([sys.executable, str(args.adapter / 'tools/fix-fcitx-candidate-theme.py'),
+                        '--home', str(home), '--source', str(source)], check=True)
         record = home / ".local/state/nyxuri/mocha-full-installed.json"
         record.write_text(json.dumps({"upstream": PIN, "backup": str(backup), "modules": names,
             "hardware": {"transform": 270, "scale": 1.5, "render_node": "renderD128"}}, indent=2) + "\n")

@@ -1,0 +1,19 @@
+--- a/src/gallium/winsys/nouveau/drm/nouveau.c
++++ b/src/gallium/winsys/nouveau/drm/nouveau.c
+@@ -1593,6 +1593,16 @@
+    }
+    nvpb->type |= NOUVEAU_BO_MAP;
+ 
++   /* Command buffers are CPU-write/GPU-read uploads. On non-coherent
++    * GK20A, use write-combined CPU mappings instead of cleaning every
++    * page of the command ring on every push. Keep the type on nvpb so
++    * later ring growth uses the same mapping policy. This does not
++    * change imported buffers, CPU readback or fence allocations.
++    */
++   if (client->device->chipset == 0xea &&
++       (nvpb->type & NOUVEAU_BO_GART) && drm->version >= 0x01000202)
++      nvpb->type |= NOUVEAU_BO_COHERENT;
++
+    for (nvpb->bo_nr = 0; nvpb->bo_nr < nr; nvpb->bo_nr++) {
+       ret = nouveau_bo_new(client->device, nvpb->type, 0, size, NULL, &nvpb->bos[nvpb->bo_nr]);
+       if (ret) {

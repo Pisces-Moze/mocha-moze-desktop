@@ -1,0 +1,17 @@
+{
+  "fonts\\GoogleSans.ttf": {
+    "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/googlesans/GoogleSans%5BGRAD%2Copsz%2Cwght%5D.ttf",
+    "sha256": "d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a",
+    "bytes": 4974940
+  },
+  "fonts\\OFL.txt": {
+    "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/googlesans/OFL.txt",
+    "sha256": "2b75ef20f13d83a7514aee452c4782c20cdc9ff2dee17600f44d37a06d4fb958",
+    "bytes": 4488
+  },
+  "debian-swirl.svg": {
+    "url": "https://www.debian.org/logos/openlogo-nd.svg",
+    "sha256": "89a3ca1a1bc91610edcc637457e7275a159309f4621829b2a0170e28970cac20",
+    "bytes": 6863
+  }
+}

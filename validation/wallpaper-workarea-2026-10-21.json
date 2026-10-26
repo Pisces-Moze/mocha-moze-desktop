@@ -1,0 +1,172 @@
+{
+  "date": "2026-10-21",
+  "status": "persistently_installed_and_final_live_checks_passed",
+  "kernel": "6.12.111-moze.1-native-vde2",
+  "niri_sha256": "8b9e73b512229a1649464e0c4de538f04115c52edfdfe733c2831c290e9af068",
+  "previous_candidate_sha256": "e138f981ab49d798bbc94453ca3271078fcb0da8916051c20a2595444fa45491",
+  "plugin_service_sha256": "061987a4ab05068ea452d14a632fd344960d41ab8a725e1a74af4c31ee31fb30",
+  "patches": [
+    "vde/0018-niri-workarea-coverage.patch",
+    "vde/0019-noctalia-workarea-coverage.patch"
+  ],
+  "policy": {
+    "schema": 2,
+    "configured_gap_limit_logical_px": 32,
+    "fractional_rounding_tolerance_logical_px": 2,
+    "default_hold_seconds": 2,
+    "real_visibility_retained_separately": true,
+    "overview_and_panels_continue_playing": true,
+    "cached_background_preserves_translucency_and_blur": true,
+    "existing_memory_pressure_and_static_choice_take_priority": true
+  },
+  "checks": {
+    "native_focus_tests": 3,
+    "native_coverage_tests": 4,
+    "armhf_release_build": "passed",
+    "download_and_device_stage_hash": "matched",
+    "post_install_shell": {
+      "barVisible": true,
+      "panelOpen": false,
+      "locked": false,
+      "schema": 2
+    },
+    "lua_occlusion_and_workspace_policy": "passed",
+    "resource_pressure_and_static_handover": "passed",
+    "eight_patch_prefix_installer": "passed"
+  },
+  "first_candidate_live": {
+    "partly_exposed": "playing",
+    "maximized_with_taskbar": {
+      "visible": true,
+      "workarea_covered": true,
+      "players": 0,
+      "holders": 0,
+      "vde": "suspended",
+      "vde_ref": 0
+    },
+    "overview": "playing_vde_active",
+    "panel": "player_resumed",
+    "two_half_width_columns": "failed_fractional_rounding_fringe"
+  },
+  "final_candidate_live": {
+    "post_install_shell": "passed",
+    "partly_exposed": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "vde_ref": 2,
+      "hint": [
+        {
+          "output": "DSI-1",
+          "overview": false,
+          "pid": 539,
+          "schema": 2,
+          "shell_overlay": false,
+          "visible": true,
+          "workarea_covered": false
+        }
+      ]
+    },
+    "maximized_with_taskbar": {
+      "players": 0,
+      "holders": 0,
+      "vde": "suspended",
+      "vde_ref": 0,
+      "hint": [
+        {
+          "output": "DSI-1",
+          "overview": false,
+          "pid": 539,
+          "schema": 2,
+          "shell_overlay": false,
+          "visible": true,
+          "workarea_covered": true
+        }
+      ]
+    },
+    "two_half_width_columns": {
+      "players": 0,
+      "holders": 0,
+      "vde": "suspended",
+      "vde_ref": 0,
+      "hint": [
+        {
+          "output": "DSI-1",
+          "overview": false,
+          "pid": 539,
+          "schema": 2,
+          "shell_overlay": false,
+          "visible": true,
+          "workarea_covered": true
+        }
+      ]
+    },
+    "overview": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "vde_ref": 2,
+      "hint": [
+        {
+          "output": "DSI-1",
+          "overview": true,
+          "pid": 539,
+          "schema": 2,
+          "shell_overlay": false,
+          "visible": true,
+          "workarea_covered": false
+        }
+      ]
+    },
+    "panel": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "vde_ref": 2,
+      "hint": [
+        {
+          "output": "DSI-1",
+          "overview": false,
+          "pid": 539,
+          "schema": 2,
+          "shell_overlay": true,
+          "visible": true,
+          "workarea_covered": true
+        }
+      ]
+    },
+    "uncovered": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "vde_ref": 2,
+      "hint": [
+        {
+          "output": "DSI-1",
+          "overview": false,
+          "pid": 539,
+          "schema": 2,
+          "shell_overlay": false,
+          "visible": true,
+          "workarea_covered": false
+        }
+      ]
+    },
+    "resumed_decoder": "v4l2request",
+    "success": true
+  },
+  "limits": [
+    "The previous black screen and USB loss left no persistent prior-boot journal or pstore evidence; its cause is not established.",
+    "No wallpaper quality, frame rate, blur, opacity or gap changes were made.",
+    "No CPU or interaction-performance improvement is claimed.",
+    "Kernel, partition layout and matching Noctalia/keyboard binaries remain unchanged."
+  ],
+  "interrupted_attempt": {
+    "physical_screen": "black",
+    "recovery": "USB and desktop restored; same final binary running after a new boot",
+    "previous_journal": "not persistent",
+    "pstore": "empty",
+    "cause": "undetermined",
+    "retry": "concentrated live test passed; no forced additional reboot"
+  }
+}

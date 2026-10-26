@@ -29,12 +29,17 @@ XML='''<node><interface name="org.fcitx.Fcitx5.VirtualKeyboard1">
 class Keyboard:
     def __init__(self):
         self.shift=False; self.symbols=False; self.ctrl=False
+        self.visibility_file = Path(os.environ['XDG_RUNTIME_DIR']) / 'mocha-keyboard-visible.json'
+        self.last_visibility = None
+        self.visibility_pending = 0
         self.bus=Gio.bus_get_sync(Gio.BusType.SESSION,None)
         self.window=Gtk.Window(title='Mocha 中文触屏键盘')
         self.window.set_accept_focus(False)
         GtkLayerShell.init_for_window(self.window)
         GtkLayerShell.set_namespace(self.window,'mocha-touch-keyboard')
-        GtkLayerShell.set_layer(self.window,GtkLayerShell.Layer.TOP)
+        # Stay above Top panels; Overlay panel shields also exclude the live
+        # rectangles published below. NONE keeps the text input focused.
+        GtkLayerShell.set_layer(self.window,GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_mode(self.window,GtkLayerShell.KeyboardMode.NONE)
         for edge in (GtkLayerShell.Edge.BOTTOM,GtkLayerShell.Edge.LEFT,GtkLayerShell.Edge.RIGHT):
             GtkLayerShell.set_anchor(self.window,edge,True)
@@ -55,6 +60,7 @@ class Keyboard:
         scroller.set_policy(Gtk.PolicyType.AUTOMATIC,Gtk.PolicyType.NEVER)
         scroller.set_kinetic_scrolling(True)
         scroller.set_size_request(620,58)
+        self.candidate_scroller=scroller
         self.candidate_swipe=Gtk.GestureSwipe.new(scroller)
         self.candidate_swipe.connect('swipe',lambda _,vx,vy:self.backend('NextPage' if vx<0 else 'PrevPage') if abs(vx)>200 and abs(vx)>abs(vy) else None)
         scroller.add(self.candidates)
@@ -84,16 +90,20 @@ class Keyboard:
         self.theme_monitor=Gio.File.new_for_path(str(self.theme_directory)).monitor_directory(Gio.FileMonitorFlags.NONE,None)
         self.theme_monitor.connect('changed',self.theme_changed)
         self.window.connect('destroy',Gtk.main_quit)
+        for window in (self.window,self.candidate_window):
+            for event in ('size-allocate','map','unmap'):
+                window.connect(event,self.queue_visibility)
         self.registration=self.bus.register_object('/org/fcitx/virtualkeyboard/impanel',Gio.DBusNodeInfo.new_for_xml(XML).interfaces[0],self.method,None,None)
         self.owner=Gio.bus_own_name_on_connection(self.bus,UI,Gio.BusNameOwnerFlags.NONE,None,None)
         self.window.show_all()
-        self.visibility_file = Path(os.environ['XDG_RUNTIME_DIR']) / 'mocha-keyboard-visible.json'
         self.record_visibility(True)
-        atexit.register(self.visibility_file.unlink, missing_ok=True)
+        atexit.register(self.record_visibility,False)
         GLib.timeout_add(250,self.show_fcitx)
         signal.signal(signal.SIGUSR1,lambda *_:GLib.idle_add(self.visible,False))
         signal.signal(signal.SIGUSR2,lambda *_:GLib.idle_add(self.visible,True))
         signal.signal(signal.SIGRTMIN,lambda *_:GLib.idle_add(self.visible,not self.window.get_visible()))
+        for signum in (signal.SIGTERM,signal.SIGINT):
+            signal.signal(signum,lambda *_:GLib.idle_add(Gtk.main_quit))
 
     def theme_changed(self,monitor,file,other,event):
         if file.get_basename() not in ('gtk.css','settings.ini'):
@@ -152,11 +162,33 @@ class Keyboard:
         return False
 
     def record_visibility(self, visible):
-        # Only process identity and visibility; never input or candidate text.
+        # Only surface geometry/identity; never input or candidate text.
+        state={'pid':os.getpid(),'visible':bool(visible and self.window.get_mapped()),'rects':[]}
+        native=self.window.get_window()
+        if state['visible'] and native:
+            monitor=self.window.get_display().get_monitor_at_window(native)
+            g=monitor.get_geometry()
+            state['monitor']={'x':g.x,'y':g.y,'width':g.width,'height':g.height}
+            for window in (self.window,self.candidate_window):
+                if window.get_mapped():
+                    state['rects'].append({'width':window.get_allocated_width(),'height':window.get_allocated_height(),
+                        'bottom':GtkLayerShell.get_margin(window,GtkLayerShell.Edge.BOTTOM)})
+        encoded=json.dumps(state,sort_keys=True)
+        if encoded==self.last_visibility:return
         temporary = self.visibility_file.with_suffix('.new')
-        temporary.write_text(json.dumps({'pid': os.getpid(), 'visible': visible}))
+        temporary.write_text(encoded)
         temporary.chmod(0o600)
         os.replace(temporary, self.visibility_file)
+        self.last_visibility=encoded
+
+    def queue_visibility(self,*_):
+        if not self.visibility_pending:
+            self.visibility_pending=GLib.idle_add(self.flush_visibility)
+
+    def flush_visibility(self):
+        self.visibility_pending=0
+        self.record_visibility(self.window.get_visible())
+        return False
 
     def method(self,connection,sender,path,interface,method,params,invocation):
         # Only the input framework may supply preedit/candidate updates.
@@ -171,6 +203,10 @@ class Keyboard:
                 else: button.hide()
             if values[0] and self.window.get_visible():self.candidate_window.show_all()
             else:self.candidate_window.hide()
+            # A new composition/page must start at candidate zero, rather than
+            # retaining the previous horizontally scrolled viewport.
+            adjustment=self.candidate_scroller.get_hadjustment()
+            adjustment.set_value(adjustment.get_lower())
         # Visibility remains manual; focus changes do not open/hide this app.
         invocation.return_value(None)
 

@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-23",
+  "device": "Mocha / Tegra124 / armhf",
+  "kernel": "6.12.111-moze.1-native-vde2",
+  "trigger": "User reports excessive CPU and memory while playing Bilibili at its lowest quality",
+  "installed": {
+    "defaults": "config/firefox-mocha-low-memory.js",
+    "defaults_sha256": "8eb278c2786f4754d3f9796ac99317a2584dcdbebcb0138fbdc1efb806d48d42",
+    "default_policy": "config/firefox-mocha-low-memory-policies.json",
+    "policy_sha256": "415c3ea546192fde5533d70d45fd94505e98203229ee9ea5b4cd0a4e05d7fc77",
+    "policy_mode": "Merge editable defaults, preserving unrelated policies",
+    "runtime_defaults_link": true,
+    "original_state_and_user_session_backed_up": true,
+    "user_browser_restarted_and_session_restored": true,
+    "security_isolation_and_sandboxes_preserved": true
+  },
+  "configuration_check": {
+    "scope": "Separate temporary headless Firefox instance, not a GPU or frame-rate benchmark",
+    "effective_default_count": 10,
+    "all_checked_preferences_are_defaults_not_user_values": true,
+    "media_source_support": { "av1": false, "hevc": false, "avc": true },
+    "automatic_tab_unload": "Not enabled: this Linux runtime resets the unsupported feature to false",
+    "diagnostic_instance_stopped": true,
+    "production_debugger_enabled": false
+  },
+  "before": {
+    "observation": "Two dav1d-worker threads, VDE suspended",
+    "thread_sample_seconds": 4,
+    "dav1d_combined_single_core_percent": 60.8,
+    "scope": "Observed thread sample, not a controlled full-browser before/after benchmark"
+  },
+  "after_user_confirmed_playing_same_video": {
+    "sample_seconds": 6,
+    "decoder_threads": ["av:h264:df0", "av:h264:df1"],
+    "cpu_percent_of_one_core": {
+      "firefox_parent": 92.0,
+      "rdd_decoder": 25.0,
+      "video_web_content": 72.3,
+      "other_web_content": 0.2,
+      "niri": 24.5,
+      "noctalia": 17.8
+    },
+    "memory_kib": { "MemFree": 126536, "MemAvailable": 457084, "SwapFree": 233136 },
+    "memory_psi_avg10": { "some": 0.0, "full": 0.0 },
+    "cpu_psi_some_avg10": 36.04,
+    "cpu_frequency_khz": { "current": 714000, "maximum": 714000, "minimum": 204000 },
+    "firefox_audio_stream": "running"
+  },
+  "limits": [
+    "H.264 is still software decoded by Firefox; no browser V4L2 Request backend was added",
+    "Webpage and Firefox rendering remain substantial CPU consumers",
+    "Memory snapshots differ in loading/cache/swap state and do not establish exact memory savings",
+    "Short playback sample does not establish long-term memory stability or frame-time improvement",
+    "No video quality, wallpaper file, desktop effects, or CPU voltage/frequency policy was changed"
+  ],
+  "remaining": [
+    "Broader H.264 VDE format support including CABAC",
+    "Firefox hardware decoder integration and real-site validation",
+    "Webpage/rendering CPU attribution and long-session memory assessment"
+  ]
+}

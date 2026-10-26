@@ -1,0 +1,685 @@
+{
+  "date": "2026-10-25",
+  "status": "Complete: final #9 kernel, initramfs and LNX installed; readback and ordinary cold boot verified; user confirms normal animation/logs/desktop",
+  "request": "Bottom two-line powered by / debian with icon, smoother loading ring; preserve original avatar and logs; persistent installation remains authorized",
+  "artwork": {
+    "tool": "built-in imagegen background-removal edit",
+    "file": "boot-animation/moze-avatar-cutout.png",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "fully_transparent_pixels": 449246,
+    "original_framing_retained": true,
+    "pixel_exact_foreground_comparison": "not asserted"
+  },
+  "verified": [
+    "Complete ARM kernel Image linked successfully after div_u64 fix",
+    "Complete test and emmc U-Boot ARM builds and Android wrappers",
+    "All release SHA256 hashes checked after download",
+    "Full portrait shared native pixel sampler passed ASan and UBSan",
+    "Loop head/tail forward continuity checked including seam",
+    "Fresh 2026-10-25 LNX/kernel/initramfs/DTB backups verified on device and PC",
+    "Candidate uImage header/data CRC and staged SHA256 passed; default kernel unchanged"
+  ],
+  "default_logs": {
+    "uboot": "Standard vidconsole glyphs and ANSI foreground colours",
+    "earlycon": "Original mocha_fb_write font, layout and control characters; background-only hooks",
+    "fbcon": "Native sys_imageblit/fillrect/copyarea; temporary text and coverage buffers; no userspace kmsg renderer"
+  },
+  "production": {
+    "default_boot_changed": true,
+    "custom_kmsg_service_installed": false,
+    "custom_kmsg_service_active": false,
+    "original_niri_entry_restored": true,
+    "backup": "/srv/mocha-data/codex-debian-desktop/backups/boot-animation-20261025-before-install",
+    "persistent_install_authorized": true,
+    "fresh_preinstall_backup": "boot-animation/DEPLOYMENT.md",
+    "lnx_backup_sha256": "0d4d4aff2d4aa94fa3891e1358113f39f74c688dbcdb65dc2a1a57a56e6fa9a0",
+    "fresh_preinstall_backup_date": "2026-10-25",
+    "installation": {
+      "state": "installed-readback-and-ordinary-boot-verified",
+      "kernel_sha256": "eb6933922d8c420bef3ab54b009dc02fcddb3ed0f449eba0cf5b748cd26e1fe3",
+      "initramfs_sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e",
+      "lnx_image_sha256": "1e938806a8af61fd26d7c85c0994fdd8394dd7303d71e5428802aa928a5cdbc2",
+      "lnx_partition_sha256": "2d86df8a7a38c3fa2d805fefd2dc6733b410d63769488252a49210d6ac9da45a",
+      "backup": "/srv/mocha-data/codex-debian-desktop/backups/boot-animation-20261025-before-install"
+    },
+    "ordinary_cold_boot": {
+      "boot_id": "6a538100-68c1-41d2-b910-85b07b2a3b51",
+      "different_from_ram_boot": true,
+      "version": "Linux version 6.12.111-moze.1-native-vde2 (root@49c8ef86041b) (arm-linux-gnueabihf-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #9 SMP PREEMPT Sun Oct 25 03:59:20 UTC 2026",
+      "bootargs": "mem=1700M maxcpus=4 root=/dev/mmcblk0p26 rootfstype=ext4 rootwait rw console=ttyS0,115200n8 console=tty0 panic=30 loglevel=6 clk_ignore_unused regulator_ignore_unused earlycon=mochafb,moze mocha_boot_animation=1 mocha_desktop_requested=1 mocha_power_key_early=held cpuidle.off=1",
+      "native_attachment": [
+        "[    1.846412] Moze boot background attached to tegradrmfb (1536x2048, 32 bpp)"
+      ],
+      "niri": [
+        "563"
+      ],
+      "critical_errors": [],
+      "default_files_and_lnx_verified": true,
+      "installation": {
+        "state": "installed-and-readback-verified; ordinary-boot-pending",
+        "kernel_sha256": "eb6933922d8c420bef3ab54b009dc02fcddb3ed0f449eba0cf5b748cd26e1fe3",
+        "initramfs_sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e",
+        "lnx_image_sha256": "1e938806a8af61fd26d7c85c0994fdd8394dd7303d71e5428802aa928a5cdbc2",
+        "lnx_partition_sha256": "2d86df8a7a38c3fa2d805fefd2dc6733b410d63769488252a49210d6ac9da45a",
+        "backup": "/srv/mocha-data/codex-debian-desktop/backups/boot-animation-20261025-before-install"
+      },
+      "user_report": "正常"
+    }
+  },
+  "pending": [],
+  "source_sha256": {
+    "boot-animation/BRANDING-LICENSE.md": "8eda06c78d65c5f548a0a5088ad486e03160cc42012b6bc23c9d6fa05a7a5633",
+    "boot-animation/branding-sources.json": "1096745e74ac5e8fcd292bce4286b952c7e7cc51735f03ccd864741f52c9dce8",
+    "boot-animation/build-assets.py": "97bb092d805bdd17fcfb3a081ca8b7c48b3c15df2d3ac633dac812b943abc23f",
+    "boot-animation/debian-swirl-small.png": "7c6320f604494c7976ed396c64a0096c60b9b049dee6eeda2fa213426685d1ad",
+    "boot-animation/debian-swirl.svg": "89a3ca1a1bc91610edcc637457e7275a159309f4621829b2a0170e28970cac20",
+    "boot-animation/DEPLOYMENT.md": "2039b823f7c63627fe94d200061582f0ab2c6e22bfb1ccb66df982de09de5322",
+    "boot-animation/moze-avatar-cutout.png": "c9f460dc8dab0908838b81bd6373e8a0c826471591af37acb00e90df2a7bfd37",
+    "boot-animation/moze-boot-art.h": "11e6422aa5f31ca91081ba27d9b0abbbe1337e996b7156fde43182d1ffaa6b3f",
+    "boot-animation/moze-boot-assets.h": "05c5a90550e935d13d183d3306df172e94e9b3c0c14fc2d4efbf5f2217c4e962",
+    "boot-animation/moze-footer.png": "9ffbc0b634253e4815f908ecda03bbb3a0f6c71e82d58d499e5b235efb302712",
+    "boot-animation/powered-by-debian.png": "4fa05eb4b47480d2ca8dac1cd7cd4744d26e937c73b3dd698ae5bb1190ce0aec",
+    "boot-animation/preview-boot.log": "2306638a2df2aeeb6940ff558d2bfdd1786111a32d887b55432c0e55afcaa4a6",
+    "boot-animation/preview.html": "11d04c993b838428fd1f5cee212fd94031ce4b6f823f7cdd9c603b57151013e4",
+    "boot-animation/PROMPT.md": "e8e3d176633a6f11055852aa35f892e045eb54d0bf2952dd788781f17bacd248",
+    "boot-animation/README.md": "acf15063f6f972e7b087156d9a35af415a24a28932e70e42132fd25863da3719",
+    "boot-animation/render-branding.py": "ea9c4d8245ff69db81e3126966a8f9dca60cfe3f61aabc9bad4b485bff7579b4",
+    "boot-animation/spinner-frames.json": "ddc695d50ffde2043f68c535c41a038a8ff216a940c009e1b7287b65b7100d4b",
+    "boot-animation/fonts/GoogleSans.ttf": "d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a",
+    "boot-animation/fonts/OFL.txt": "2b75ef20f13d83a7514aee452c4782c20cdc9ff2dee17600f44d37a06d4fb958"
+  },
+  "layout": {
+    "width": 1536,
+    "height": 2048,
+    "rotation": "physical portrait, no artwork rotation",
+    "avatar": {
+      "x": 558,
+      "y": 430,
+      "width": 420,
+      "height": 420
+    },
+    "ring": {
+      "x": 736,
+      "y": 1388,
+      "width": 64,
+      "height": 64,
+      "frames": 120,
+      "frame_ms": 20,
+      "alpha_bits": 4,
+      "asset_bytes_total": 523984,
+      "cycle_ms": 2400,
+      "radius": 27,
+      "stroke_width": 3.5,
+      "antialias_grid": "4x4",
+      "arc_degrees": [
+        48,
+        252
+      ],
+      "forward_only_endpoints": true
+    },
+    "extra_text": "only user-requested bottom branding plus native console logs",
+    "native_logs": true,
+    "desktop_charger_orientation_changed": false,
+    "brand": {
+      "x": 468,
+      "y": 1760,
+      "width": 600,
+      "height": 144,
+      "top_text": "powered by",
+      "bottom_text": "debian",
+      "two_lines": true,
+      "font": "Official Google Sans, OFL 1.1",
+      "icon": "Official Debian open-use swirl"
+    },
+    "footer": {
+      "x": 648,
+      "y": 1940,
+      "width": 240,
+      "height": 60,
+      "text": "Moze"
+    }
+  },
+  "builder_input_sha256": "f6a31fd1996aa55267a64b18b656f1ed95c20ee5f9398e5b4f001ce4a2d0bb60",
+  "build": {
+    "emmc-config": {
+      "bytes": 55135,
+      "sha256": "e711ca4c559e3475e170f58fbdd74406475139a119d14eb18cbb80ecd17a2340"
+    },
+    "test-u-boot-dtbbin": {
+      "bytes": 1094392,
+      "sha256": "3c8f7f8e72e72777a5ed9649c4dae341278d08fed72c1ca655345fad51e02497"
+    },
+    "emmc-u-boot-dtbbin": {
+      "bytes": 1094432,
+      "sha256": "a9ab2d4be07e1d1a9129461d635d113c143281b8d9f7451ab03892e49158c1e9"
+    },
+    "emmc-u-boot": {
+      "bytes": 5611140,
+      "sha256": "97d313ff99e4c7145bad8fc162a4827849e7f29cad62bcc1184ce6bf51820691"
+    },
+    "test-u-boot": {
+      "bytes": 5611028,
+      "sha256": "88c78acbf7341f931eb54856b06a16719b3159515d54de9e645925b06895d9ae"
+    },
+    "uImage-moze-log-candidate": {
+      "bytes": 24770756,
+      "sha256": "dc6edb51077f3b2ff9df53a764ba757a117a54f8b50468a9ed96051337ed26f6"
+    },
+    "test-config": {
+      "bytes": 55140,
+      "sha256": "425e4fda6fc0288c868f8a5dc7b4c8324b8d5cee1ae3351efbd9f66b434177a7"
+    },
+    "kernel_release": "6.12.111-moze.1-native-vde2",
+    "physical_validation": "pending",
+    "layout": "bottom two-line powered by / debian plus icon; smooth forward-only ring; Moze at very bottom",
+    "input_sha256": "f6a31fd1996aa55267a64b18b656f1ed95c20ee5f9398e5b4f001ce4a2d0bb60",
+    "emmc_image_sha256": "c587878a0c244c53eaf8fe726776da1698e94dc851e329e8a131eadadbc33f74",
+    "test_image_sha256": "63996e9db91c1f686969704f33ef5f1bc907b570ccd0e105a687263dcd724866",
+    "date": "2026-10-25"
+  },
+  "staging": {
+    "candidate_bytes": 24770756,
+    "candidate_sha256": "dc6edb51077f3b2ff9df53a764ba757a117a54f8b50468a9ed96051337ed26f6",
+    "default_kernel_sha256": "c46848142f4a43af51b121d67fba3c40728994065a20cd13040c2ae6cb7bfbd5",
+    "default_unchanged": true
+  },
+  "physical_observation": {
+    "time": "2026-10-24T16:40:57.674893+00:00",
+    "user_report": "可以看到头像、两行 Debian 标识、加载圈和滚动日志，但是boot_没有定义。tegra124(mocha)#",
+    "artwork_visible": true,
+    "native_uboot_logs_visible": true,
+    "desktop_handoff_confirmed": false,
+    "exact_undefined_name": "boot_ (truncated command)",
+    "exact_error_lines": [
+      "env_buf [32 bytes] too small for value of \"bootcmd\"",
+      "env_buf [32 bytes] too small for value of \"sample_power_key\"",
+      "## Error: \"boot_\" not defined",
+      "Tegra124 (mocha) #"
+    ]
+  },
+  "environment_fix": {
+    "root_cause": "Hash-prefixed comment in animation .env generated =# RAM test profile...; himport_r rejected empty variable name with EINVAL, leaving early env_get limited to 32 bytes",
+    "changed_source": "mocha-moze-boot/overlay/board/xiaomi/mocha/mocha_animation_test.env",
+    "source_sha256": "ecd17d14aec3f0dccd9ddf2e6cdb79d4d61706436013d85339031772fc414ae5",
+    "build": {
+      "emmc-config": {
+        "bytes": 55135,
+        "sha256": "e711ca4c559e3475e170f58fbdd74406475139a119d14eb18cbb80ecd17a2340"
+      },
+      "emmc-environment.h": {
+        "bytes": 966,
+        "sha256": "2fe64c4262b92795654cf67b37e3510fd1b18c4e46b8b491f2df41d20a2d38d4"
+      },
+      "test-u-boot-dtbbin": {
+        "bytes": 1094520,
+        "sha256": "387fd73ea8814f709b0e9d0fde1912f827ac67d8b21a60743f2cc16f8278362f"
+      },
+      "emmc-u-boot-dtbbin": {
+        "bytes": 1094624,
+        "sha256": "1a57fcdb54b1132942d8bbd5b6fb840c3a230d24493dc7fa54f7126feb20302d"
+      },
+      "emmc-u-boot": {
+        "bytes": 5611756,
+        "sha256": "759d048cfa232ed3644ae751b722a1d1413f9221edd409641c6ebd85bb545aea"
+      },
+      "test-environment-check.json": {
+        "bytes": 148,
+        "sha256": "511bb262bf7485ec52f94848300e45b0430e41e9062a2d51d637a6e78c89e23e"
+      },
+      "test-u-boot": {
+        "bytes": 5611628,
+        "sha256": "0ccece6e514969efc93ad6d8941752f8272d26962f4f6c0f5f087da64cf1970b"
+      },
+      "uImage-moze-log-candidate": {
+        "bytes": 24770756,
+        "sha256": "dc6edb51077f3b2ff9df53a764ba757a117a54f8b50468a9ed96051337ed26f6"
+      },
+      "test-config": {
+        "bytes": 55140,
+        "sha256": "425e4fda6fc0288c868f8a5dc7b4c8324b8d5cee1ae3351efbd9f66b434177a7"
+      },
+      "test-environment.h": {
+        "bytes": 858,
+        "sha256": "7e1f9ee2b79dbd40f59052385db08d00e03ae3dd5499845a698c75993e85ec28"
+      },
+      "emmc-environment-check.json": {
+        "bytes": 143,
+        "sha256": "c045ad8e0d505c2e606095885316b712713315d2ac9eb2db88d5c9c6d862e9b2"
+      },
+      "board-disassembly.txt": {
+        "bytes": 5194,
+        "sha256": "c763c72c3f97dff4865a2fd6ad83073dd0675de152ac01247114f03eba6d171a"
+      },
+      "kernel_release": "6.12.111-moze.1-native-vde2",
+      "physical_validation": "pending",
+      "layout": "bottom two-line powered by / debian plus icon; smooth forward-only ring; Moze at very bottom",
+      "fix": "Remove invalid hash-prefixed comment generating an empty environment key; validate actual linked table before packaging",
+      "board_source_sha256": "a89f8ab1f8e923d7ffb059a41c7cb6f2a092f60a74b554e78c6da7de9889ea7b",
+      "test_image_sha256": "47506bf435f2ed5c958ef4b2525d058712a925c1b57393095a107d6c73322e39",
+      "emmc_image_sha256": "b9e4e807c9f4534c94dadd78df897eee88dc8d9c366ab8b18e193427c9aecd0a",
+      "date": "2026-10-25"
+    },
+    "linked_environment_checks": [
+      {
+        "release": "branded-boot-env-ready-release-20261025",
+        "profile": "test",
+        "accepted": false,
+        "output": "Invalid linked boot environment: Malformed environment entry (empty name): b'=# RAM test profile; never selected by the default emmc build.'"
+      },
+      {
+        "release": "branded-boot-env-clean-release-20261025",
+        "profile": "test",
+        "accepted": true,
+        "output": "{\"profile\": \"animation\", \"entries\": 26, \"bytes\": 1361, \"sha256\": \"92b8a46914124209ebcd6c2932af3a33ac39476764c518102282173b38966ece\", \"valid\": true}"
+      },
+      {
+        "release": "branded-boot-env-clean-release-20261025",
+        "profile": "emmc",
+        "accepted": true,
+        "output": "{\"profile\": \"emmc\", \"entries\": 26, \"bytes\": 1465, \"sha256\": \"7a0bf3037f926487872e6708863c27dbf5cfca56dfbf2bdb9326913809d7a9bc\", \"valid\": true}"
+      }
+    ],
+    "physical_validation": "Confirmed runtime #5, animation bootargs, moze_native_tick and Niri; user reports normal desktop, boot-ring stutter and black interval",
+    "physical_observation": {
+      "time": "2026-10-25T00:57:39.513745+08:00",
+      "user_report": "需要充电；充电动画",
+      "linux_charging_ui_observed": true,
+      "desktop_handoff_confirmed": false,
+      "battery_capacity_measured": false
+    }
+  },
+  "environment_guard_attempt": {
+    "source": "mocha-moze-boot/overlay/board/xiaomi/mocha/mocha.c",
+    "source_sha256": "a89f8ab1f8e923d7ffb059a41c7cb6f2a092f60a74b554e78c6da7de9889ea7b",
+    "changes": [
+      "Import compiled defaults if GD_FLG_ENV_READY is absent before autoboot",
+      "Fail visibly if RAM environment or power-key variables cannot be initialised"
+    ],
+    "build": {
+      "emmc-config": {
+        "bytes": 55135,
+        "sha256": "e711ca4c559e3475e170f58fbdd74406475139a119d14eb18cbb80ecd17a2340"
+      },
+      "emmc-environment.h": {
+        "bytes": 966,
+        "sha256": "2fe64c4262b92795654cf67b37e3510fd1b18c4e46b8b491f2df41d20a2d38d4"
+      },
+      "test-u-boot-dtbbin": {
+        "bytes": 1094576,
+        "sha256": "10c6ecdb859f5e591c1a06f787e4605015e0014ecff77f697c3fc5cd268ccee6"
+      },
+      "emmc-u-boot-dtbbin": {
+        "bytes": 1094624,
+        "sha256": "3f44dc0e6f5c29d4b1060e67ce1582a4e4f2fde00c35ccd7498dfc6d6a47af0b"
+      },
+      "emmc-u-boot": {
+        "bytes": 5611756,
+        "sha256": "06e4bd7dc8c2e4029b31ef8c064556e0a1f921c14347ab21b064f58958f427f7"
+      },
+      "test-u-boot": {
+        "bytes": 5611724,
+        "sha256": "0a4cb19d1305384c37a4d8626b95edd3123d4991af784b4913c09b53fc156633"
+      },
+      "uImage-moze-log-candidate": {
+        "bytes": 24770756,
+        "sha256": "dc6edb51077f3b2ff9df53a764ba757a117a54f8b50468a9ed96051337ed26f6"
+      },
+      "test-config": {
+        "bytes": 55140,
+        "sha256": "425e4fda6fc0288c868f8a5dc7b4c8324b8d5cee1ae3351efbd9f66b434177a7"
+      },
+      "test-environment.h": {
+        "bytes": 922,
+        "sha256": "c55569b59d3f3fb3d5d8e5f751dbfd9c53dc7ba53053981f71bbf1c805d894ed"
+      },
+      "board-disassembly.txt": {
+        "bytes": 5194,
+        "sha256": "c763c72c3f97dff4865a2fd6ad83073dd0675de152ac01247114f03eba6d171a"
+      },
+      "kernel_release": "6.12.111-moze.1-native-vde2",
+      "physical_validation": "pending",
+      "layout": "bottom two-line powered by / debian plus icon; smooth forward-only ring; Moze at very bottom",
+      "fix": "Initialise RAM environment before long autoboot scripts; reject failed key-state writes",
+      "board_source_sha256": "a89f8ab1f8e923d7ffb059a41c7cb6f2a092f60a74b554e78c6da7de9889ea7b",
+      "test_image_sha256": "12797525fe9d2f99fce758c594951be8a52ac9221622f09cd1b3503e36247aed",
+      "emmc_image_sha256": "1ce0c448dfedcb285e85cf3d1118a40093edb72891fcc2dfd069efc94d6dec62",
+      "date": "2026-10-25"
+    },
+    "physical_validation": "failed: Environment import failed errno=22; fail-fast guard halted safely"
+  },
+  "display_handoff_optimization": {
+    "baseline_native_panel_seconds": 28.755474,
+    "baseline_simpledrm_removed_seconds": 0.854314,
+    "baseline_boot_id": "3be2dd6b-d3b8-4f27-8d07-9f11a5e7df50",
+    "cause": "Panel deferred while backlight module waited until the late desktop hardware service",
+    "changes": [
+      "Independent candidate initramfs loads the verified backlight module before switch_root",
+      "U-Boot decodes packed ring alpha with a per-format palette, preserving native glyph ink",
+      "Native framebuffer uses direct RGB888/RGB565 conversions where applicable"
+    ],
+    "initramfs": {
+      "bytes": 2786057,
+      "sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e",
+      "base_sha256": "453edd88257c3f5822cd3ea337442b76562c7d91021f9b2c6efe325b60fe01e7",
+      "module_sha256": "1713514d51988cc5f264ecb1e439bb55d7a515ba52de285c12b73e9f421182e7",
+      "early_backlight": true,
+      "existing_entries_preserved_except_init": true
+    },
+    "renderer_check": {
+      "ring_pixel_comparisons": 49152,
+      "formats": [
+        16,
+        32
+      ],
+      "log_ink_preserved": true,
+      "sanitizers": "ASan+UBSan"
+    },
+    "build": {
+      "emmc-config": {
+        "bytes": 55135,
+        "sha256": "e711ca4c559e3475e170f58fbdd74406475139a119d14eb18cbb80ecd17a2340"
+      },
+      "test-u-boot-dtbbin": {
+        "bytes": 1094680,
+        "sha256": "2baf522f89a7916b0a828d3bbf7d672bfb9be0489c241bf504b781eca98c0c44"
+      },
+      "emmc-u-boot-dtbbin": {
+        "bytes": 1094776,
+        "sha256": "c18891ac1aec8a57d5f0cc6cdbcff874d3cfb288cf8d98846e9c5cbf17022342"
+      },
+      "emmc-u-boot": {
+        "bytes": 5611856,
+        "sha256": "01bfeb3d397722c43107f8b51faf53ad553341ce6cee9cbd6889fc2f7ee39ad0"
+      },
+      "test-environment-check.json": {
+        "bytes": 148,
+        "sha256": "fd989b497fc2efb85c18f609ed5c8e8b8934ae36afcc00b5de79db7afb9d5c0d"
+      },
+      "test-u-boot": {
+        "bytes": 5611728,
+        "sha256": "4f4fb0ce3a0f5e85fa4b41ac905e9f0bad3b58a4e18e02da605a6f2729b26a55"
+      },
+      "uImage-moze-log-candidate": {
+        "bytes": 24770756,
+        "sha256": "71e602f9e60299d763387cb084c0096af506966fae9250fe3016afc73b1e3b1f"
+      },
+      "test-config": {
+        "bytes": 55140,
+        "sha256": "425e4fda6fc0288c868f8a5dc7b4c8324b8d5cee1ae3351efbd9f66b434177a7"
+      },
+      "initramfs-moze-log.cpio.gz": {
+        "bytes": 2786057,
+        "sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e"
+      },
+      "emmc-environment-check.json": {
+        "bytes": 143,
+        "sha256": "c045ad8e0d505c2e606095885316b712713315d2ac9eb2db88d5c9c6d862e9b2"
+      },
+      "kernel_release": "6.12.111-moze.1-native-vde2",
+      "physical_validation": "pending",
+      "layout": "bottom two-line powered by / debian plus icon; smooth forward-only ring; Moze at very bottom",
+      "input_sha256": "58281874824cbc25ddac5cf0b003a831c5ff51ebfdfb479a9fcfa5bbdfce786e",
+      "date": "2026-10-25",
+      "fix": "Early initramfs backlight; optimized loading-ring palette and native framebuffer conversion",
+      "test_image_sha256": "d3317c0527d2f362abf8e38b15bed8fb27746cc7ca8305325f5d55a83379a978",
+      "emmc_image_sha256": "8ceb89c5ecaaf54a1a4a2d92a1f06ac7fe058bd5e5ad4a26cf7a06309d04d415"
+    },
+    "staging": {
+      "uImage-moze-log-candidate": {
+        "bytes": 24770756,
+        "sha256": "71e602f9e60299d763387cb084c0096af506966fae9250fe3016afc73b1e3b1f"
+      },
+      "initramfs-moze-log.cpio.gz": {
+        "bytes": 2786057,
+        "sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e"
+      },
+      "default_kernel_and_initramfs_unchanged": true
+    },
+    "physical_validation": {
+      "runtime": "#6",
+      "native_framebuffer_seconds": 2.434846,
+      "user_report": "没有更流畅，而且linux和debian加载阶段没有动画",
+      "remaining_cause": "Live DT is nvidia,mocha, while animation attachment only accepted xiaomi,mocha"
+    }
+  },
+  "native_handoff": {
+    "release": {
+      "emmc-config": {
+        "bytes": 55135,
+        "sha256": "e711ca4c559e3475e170f58fbdd74406475139a119d14eb18cbb80ecd17a2340"
+      },
+      "test-u-boot-dtbbin": {
+        "bytes": 1094608,
+        "sha256": "23676462e89718358399e623c1ae7587a86f7204065fa08399b511bf85e9e460"
+      },
+      "emmc-u-boot-dtbbin": {
+        "bytes": 1094704,
+        "sha256": "6e1560ee88240e2fd209ccc418b1435245fdc76d5e6b995e178af72718c98ce0"
+      },
+      "emmc-u-boot": {
+        "bytes": 5611868,
+        "sha256": "6234c603ec21ac02e488817bdef82e66e1e3877862d255dc2769ca374f6800fb"
+      },
+      "test-environment-check.json": {
+        "bytes": 148,
+        "sha256": "fd989b497fc2efb85c18f609ed5c8e8b8934ae36afcc00b5de79db7afb9d5c0d"
+      },
+      "test-u-boot": {
+        "bytes": 5611708,
+        "sha256": "3c52f0c9f22804b036cdbaf1eb219f905a90bdde7df947957f154ea949ee7aa8"
+      },
+      "uImage-moze-log-candidate": {
+        "bytes": 24770756,
+        "sha256": "4b309c9d49cd2ab8361e818b4218065a9492412343af90e8565494b8f1333e56"
+      },
+      "test-config": {
+        "bytes": 55140,
+        "sha256": "425e4fda6fc0288c868f8a5dc7b4c8324b8d5cee1ae3351efbd9f66b434177a7"
+      },
+      "initramfs-moze-log.cpio.gz": {
+        "bytes": 2786057,
+        "sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e"
+      },
+      "emmc-environment-check.json": {
+        "bytes": 143,
+        "sha256": "c045ad8e0d505c2e606095885316b712713315d2ac9eb2db88d5c9c6d862e9b2"
+      },
+      "kernel_release": "6.12.111-moze.1-native-vde2",
+      "physical_validation": "pending",
+      "layout": "bottom two-line powered by / debian plus icon; smooth forward-only ring; Moze at very bottom",
+      "input_sha256": "6199aaeab5dffd1320694d482150d414c6e666b97735a47371cb170f43db6ae2",
+      "date": "2026-10-25",
+      "fix": "Match actual nvidia,mocha; native text-row fast copy; complete forced loading-ring frame sync; early panel backlight",
+      "test_image_sha256": "2465a805659fe1d082121b039c476cbc8f46acd58f4de74d6d5c3bf1f69453f8",
+      "emmc_image_sha256": "4285a1b1417e31a81acf91a241e47dd7addbb8a2f9c3ea0350ab60956c45d4d7"
+    },
+    "runtime": {
+      "uptime": "46.17 99.92",
+      "boot_id": "678b21ff-40f8-4726-839f-175757178d70",
+      "version": "Linux version 6.12.111-moze.1-native-vde2 (root@49c8ef86041b) (arm-linux-gnueabihf-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #8 SMP PREEMPT Sun Oct 25 03:50:49 UTC 2026",
+      "display_boot_log": [
+        "[    0.000000] Linux version 6.12.111-moze.1-native-vde2 (root@49c8ef86041b) (arm-linux-gnueabihf-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #8 SMP PREEMPT Sun Oct 25 03:50:49 UTC 2026",
+        "[    0.000000] printk: legacy bootconsole [mochafb0] enabled",
+        "[    0.000000] Kernel command line: mem=1700M maxcpus=4 root=/dev/mmcblk0p26 rootfstype=ext4 rootwait rw console=ttyS0,115200n8 console=tty0 panic=30 loglevel=6 clk_ignore_unused regulator_ignore_unused earlycon=mochafb,moze mocha_boot_animation=1 mocha_desktop_requested=1 mocha_power_key_early=released cpuidle.off=1",
+        "[    0.001381] Console: colour dummy device 80x30",
+        "[    0.001408] printk: legacy console [tty0] enabled",
+        "[    0.001423] printk: legacy bootconsole [mochafb0] disabled",
+        "[    0.070552] printk: legacy console [ramoops-1] enabled",
+        "[    0.280286] printk: legacy console [ttyS0] disabled",
+        "[    0.280817] printk: legacy console [ttyS0] enabled",
+        "[    0.522882] [drm] Initialized simpledrm 1.0.0 for f1700000.framebuffer on minor 0",
+        "[    0.551721] Console: switching to colour frame buffer device 192x128",
+        "[    0.573786] simple-framebuffer f1700000.framebuffer: [drm] fb0: simpledrmdrmfb frame buffer device",
+        "[    0.875358] Console: switching to colour dummy device 80x30",
+        "[    0.878740] [drm] Initialized tegra 1.0.0 for drm on minor 1",
+        "[    0.878806] drm drm: [drm] Cannot find any crtc or sizes",
+        "[    0.879879] drm drm: [drm] Cannot find any crtc or sizes",
+        "[    1.175943] CPU: 0 UID: 0 PID: 1 Comm: swapper/0 Not tainted 6.12.111-moze.1-native-vde2 #8",
+        "[    1.499448] tegra-dsi 54400000.dsi: attaching dual-channel device 54400000.dsi.0",
+        "[    1.721473] WARNING: CPU: 3 PID: 101 at drivers/gpu/drm/drm_fb_helper.c:365 drm_fb_helper_damage_work+0x180/0x188",
+        "[    1.721590] drm drm: [drm] drm_WARN_ON_ONCE(!helper->funcs->fb_dirty)",
+        "[    1.721686] CPU: 3 UID: 0 PID: 101 Comm: kworker/3:1 Tainted: G           O       6.12.111-moze.1-native-vde2 #8",
+        "[    1.721783] Workqueue: events drm_fb_helper_damage_work",
+        "[    1.722252]  warn_slowpath_fmt from drm_fb_helper_damage_work+0x180/0x188",
+        "[    1.722368]  drm_fb_helper_damage_work from process_one_work+0x16c/0x420",
+        "[    1.722890] Moze boot background attached to tegradrmfb (1536x2048, 32 bpp)",
+        "[    1.740002] tegra-dsi 54400000.dsi: MOCHA_DSI_RESET: asserting before resume",
+        "[    1.748476] tegra-dsi 54300000.dsi: MOCHA_DSI_RESET: asserting before resume",
+        "[    2.425065] tegra-dsi 54400000.dsi: MOCHA_DSI_VIDEO: lanes=8 active=2304 hbp=70 hfp=196 sol=334",
+        "[    2.425147] tegra-dsi 54300000.dsi: MOCHA_DSI_VIDEO: lanes=8 active=2304 hbp=70 hfp=196 sol=334",
+        "[    2.666301] Console: switching to colour frame buffer device 192x128",
+        "[    2.966346] drm drm: [drm] fb0: tegradrmfb frame buffer device",
+        "[    3.115458] Bluetooth: hci0: command 0x1001 tx timeout",
+        "[   10.905359] systemd[1]: Started systemd-ask-password-console.path - Dispatch Password Requests to Console Directory Watch.",
+        "[   11.084279] systemd[1]: kmod-static-nodes.service - Create List of Static Device Nodes skipped, unmet condition check ConditionFileNotEmpty=/lib/modules/6.12.111-moze.1-native-vde2/modules.devname",
+        "[   11.141795] systemd[1]: Starting modprobe@drm.service - Load Kernel Module drm...",
+        "[   11.610873] systemd[1]: modprobe@drm.service: Deactivated successfully.",
+        "[   11.657458] systemd[1]: Finished modprobe@drm.service - Load Kernel Module drm.",
+        "[   32.990661] nouveau 57000000.gpu: drm: VRAM: 0 MiB",
+        "[   32.990680] nouveau 57000000.gpu: drm: GART: 1048576 MiB",
+        "[   32.993272] nouveau 57000000.gpu: drm: MM: using COPY for buffer copies",
+        "[   32.998300] [drm] Initialized nouveau 1.4.0 for 57000000.gpu on minor 0"
+      ],
+      "user_boot_log": "-- No entries --\n",
+      "services": "UNIT                                                     LOAD      ACTIVE   SUB     DESCRIPTION\nalsa-restore.service                                     loaded    active   exited  Save/Restore Sound Card State\nalsa-state.service                                       loaded    inactive dead    Manage Sound Card State (restore and store)\napt-daily-upgrade.service                                loaded    inactive dead    Daily apt upgrade and clean activities\napt-daily.service                                        loaded    inactive dead    Daily apt download activities\nauto-cpufreq.service                                     not-found inactive dead    auto-cpufreq.service\nbluetooth.service                                        loaded    active   running Bluetooth service\nconnman.service                                          not-found inactive dead    connman.service\ndbus.service                                             loaded    active   running D-Bus System Message Bus\ndisplay-manager.service                                  not-found inactive dead    display-manager.service\ndpkg-db-backup.service                                   loaded    inactive dead    Daily dpkg database backup service\nemergency.service                                        loaded    inactive dead    Emergency Shell\nfstrim.service                                           loaded    inactive dead    Discard unused blocks on filesystems from /etc/fstab\ngetty-static.service                                     loaded    inactive dead    getty on tty2-tty6 if dbus and logind are not available\ngetty@tty1.service                                       loaded    active   running Getty on tty1\ninitrd-cleanup.service                                   loaded    inactive dead    Cleaning Up and Shutting Down Daemons\ninitrd-parse-etc.service                                 loaded    inactive dead    Mountpoints Configured in the Real Root\ninitrd-switch-root.service                               loaded    inactive dead    Switch Root\ninitrd-udevadm-cleanup-db.service                        loaded    inactive dead    Cleanup udev Database\nkmod-static-nodes.service                                loaded    inactive dead    Create List of Static Device Nodes\nldconfig.service                                         loaded    inactive dead    Rebuild Dynamic Linker Cache\nman-db.service                                           loaded    inactive dead    Daily man-db regeneration\nmocha-backlight-access.service                           loaded    active   exited  Allow the local video group to blank the Mocha backlight\nmocha-bluetooth-hardware.service                         loaded    active   exited  Apply the Mocha Bluetooth RTS startup sequence\nmocha-boot-status.service                                loaded    inactive dead    Mocha installed Debian boot status\nmocha-charge-policy.service                              loaded    active   running Mocha BC1.2 charger input policy\nmocha-charger.service                                    loaded    inactive dead    Mocha minimal charging display\nmocha-desktop-hardware.service                           loaded    active   exited  Load the Mocha desktop GPU before the local graphical session\nmocha-desktop-once.service                               loaded    inactive dead    Consume the one-boot Mocha desktop override\nmocha-dhcp.service                                       loaded    active   running Mocha USB DHCP\nmocha-native-gpu-policy.service                          loaded    active   running Mocha stock GPU OPP policy for native desktop\nmocha-runtime-policy.service                             loaded    active   running Mocha qualified native CPU and RAM swap policy\nmocha-speaker-hardware.service                           loaded    active   exited  Initialize the Mocha protected internal stereo speakers\nmocha-ssh.service                                        loaded    active   running Mocha key authenticated SSH over USB and Wi-Fi\nmocha-touch-key-lights.service                           loaded    active   running Mocha capacitive navigation key backlight\nmocha-usb.service                                        loaded    active   exited  Mocha USB network interface\nmocha-vde-diagnostic.service                             loaded    inactive dead    Temporary Mocha VDE matched-module boot diagnostic\nmodprobe@configfs.service                                loaded    inactive dead    Load Kernel Module configfs\nmodprobe@drm.service                                     loaded    inactive dead    Load Kernel Module drm\nmodprobe@efi_pstore.service                              loaded    inactive dead    Load Kernel Module efi_pstore\nmodprobe@fuse.service                                    loaded    inactive dead    Load Kernel Module fuse\nNetworkManager-wait-online.service                       loaded    inactive dead    Network Manager Wait Online\nNetworkManager.service                                   loaded    active   running Network Manager\nplymouth-quit-wait.service                               not-found inactive dead    plymouth-quit-wait.service\nplymouth-start.service                                   not-found inactive dead    plymouth-start.service\npolkit.service                                           loaded    active   running Authorization Manager\npower-profiles-daemon.service                            loaded    active   running Power Profiles daemon\nrc-local.service                                         loaded    inactive dead    /etc/rc.local Compatibility\nrescue.service                                           loaded    inactive dead    Rescue Shell\nseatd.service                                            loaded    active   running Seat management daemon\nserial-getty@ttyS0.service                               loaded    active   running Serial Getty on ttyS0\nssh.service                                              masked    inactive dead    ssh.service\nsyslog.service                                           not-found inactive dead    syslog.service\nsystem76-power.service                                   not-found inactive dead    system76-power.service\nsystemd-ask-password-console.service                     loaded    inactive dead    Dispatch Password Requests to Console\nsystemd-ask-password-wall.service                        loaded    inactive dead    Forward Password Requests to Wall\nsystemd-backlight@backlight:mocha-miui-backlight.service loaded    active   exited  Load/Save Screen Backlight Brightness of backlight:mocha-miui-backlight\nsystemd-battery-check.service                            loaded    inactive dead    Check battery level during early boot\nsystemd-binfmt.service                                   loaded    inactive dead    Set Up Additional Binary Formats\nsystemd-bsod.service                                     loaded    inactive dead    Display Boot-Time Emergency Messages In Full Screen\nsystemd-confext.service                                  loaded    inactive dead    Merge System Configuration Images into /etc/\nsystemd-firstboot.service                                loaded    inactive dead    First Boot Wizard\nsystemd-fsck-root.service                                loaded    inactive dead    File System Check on Root Device\nsystemd-hibernate-clear.service                          loaded    inactive dead    Clear Stale Hibernate Storage Info\nsystemd-hibernate-resume.service                         loaded    inactive dead    Resume from hibernation\nsystemd-hostnamed.service                                loaded    active   running Hostname Service\nsystemd-hwdb-update.service                              loaded    inactive dead    Rebuild Hardware Database\nsystemd-initctl.service                                  loaded    inactive dead    initctl Compatibility Daemon\nsystemd-journal-catalog-update.service                   loaded    inactive dead    Rebuild Journal Catalog\nsystemd-journal-flush.service                            loaded    active   exited  Flush Journal to Persistent Storage\nsystemd-journald.service                                 loaded    active   running Journal Service\nsystemd-localed.service                                  loaded    active   running Locale Service\nsystemd-logind.service                                   loaded    active   running User Login Management\nsystemd-machine-id-commit.service                        loaded    inactive dead    Save Transient machine-id to Disk\nsystemd-modules-load.service                             loaded    active   exited  Load Kernel Modules\nsystemd-network-generator.service                        loaded    active   exited  Generate Network Units from Kernel Command Line\nsystemd-networkd-persistent-storage.service              loaded    active   exited  Enable Persistent Storage in systemd-networkd\nsystemd-networkd-wait-online.service                     loaded    inactive dead    Wait for Network to be Configured\nsystemd-networkd.service                                 loaded    active   running Network Configuration\nsystemd-oomd.service                                     not-found inactive dead    systemd-oomd.service\nsystemd-pcrlock-file-system.service                      loaded    inactive dead    Lock File Systems to TPM PCR Policy\nsystemd-pcrlock-firmware-code.service                    loaded    inactive dead    Lock Firmware Code to TPM PCR Policy\nsystemd-pcrlock-firmware-config.service                  loaded    inactive dead    Lock Firmware Configuration to TPM PCR Policy\nsystemd-pcrlock-machine-id.service                       loaded    inactive dead    Lock Machine ID to TPM PCR Policy\nsystemd-pcrlock-make-policy.service                      loaded    inactive dead    Make TPM PCR Policy\nsystemd-pcrlock-secureboot-authority.service             loaded    inactive dead    Lock UEFI SecureBoot Authority to TPM PCR Policy\nsystemd-pcrlock-secureboot-policy.service                loaded    inactive dead    Lock UEFI SecureBoot Policy to TPM PCR Policy\nsystemd-pcrmachine.service                               loaded    inactive dead    TPM PCR Machine ID Measurement\nsystemd-pcrphase-initrd.service                          loaded    inactive dead    TPM PCR Barrier (initrd)\nsystemd-pcrphase-sysinit.service                         loaded    inactive dead    TPM PCR Barrier (Initialization)\nsystemd-pcrphase.service                                 loaded    inactive dead    TPM PCR Barrier (User)\nsystemd-pstore.service                                   loaded    inactive dead    Platform Persistent Storage Archival\nsystemd-quotacheck-root.service                          loaded    inactive dead    Root File System Quota Check\nsystemd-random-seed.service                              loaded    active   exited  Load/Save OS Random Seed\nsystemd-remount-fs.service                               loaded    active   exited  Remount Root and Kernel File Systems\nsystemd-resolved.service                                 loaded    active   running Network Name Resolution\nsystemd-rfkill.service                                   loaded    inactive dead    Load/Save RF Kill Switch Status\nsystemd-soft-reboot.service                              loaded    inactive dead    Reboot System Userspace\nsystemd-sysctl.service                                   loaded    active   exited  Apply Kernel Variables\nsystemd-sysext.service                                   loaded    inactive dead    Merge System Extension Images into /usr/ and /opt/\nsystemd-sysusers.service                                 loaded    inactive dead    Create System Users\nsystemd-timesyncd.service                                loaded    active   running Network Time Synchronization\nsystemd-tmpfiles-clean.service                           loaded    inactive dead    Cleanup of Temporary Directories\nsystemd-tmpfiles-setup-dev-early.service                 loaded    active   exited  Create Static Device Nodes in /dev gracefully\nsystemd-tmpfiles-setup-dev.service                       loaded    active   exited  Create Static Device Nodes in /dev\nsystemd-tmpfiles-setup.service                           loaded    active   exited  Create System Files and Directories\nsystemd-tpm2-setup-early.service                         loaded    inactive dead    Early TPM SRK Setup\nsystemd-tpm2-setup.service                               loaded    inactive dead    TPM SRK Setup\nsystemd-udev-load-credentials.service                    loaded    active   exited  Load udev Rules from Credentials\nsystemd-udev-settle.service                              loaded    inactive dead    Wait for udev To Complete Device Initialization\nsystemd-udev-trigger.service                             loaded    active   exited  Coldplug All udev Devices\nsystemd-udevd.service                                    loaded    active   running Rule-based Manager for Device Events and Files\nsystemd-update-done.service                              loaded    inactive dead    Update is Completed\nsystemd-user-sessions.service                            loaded    active   exited  Permit User Sessions\nsystemd-vconsole-setup.service                           not-found inactive dead    systemd-vconsole-setup.service\ntlp.service                                              not-found inactive dead    tlp.service\ntuned.service                                            not-found inactive dead    tuned.service\nuser-runtime-dir@1000.service                            loaded    active   exited  User Runtime Directory /run/user/1000\nuser@1000.service                                        loaded    active   running User Manager for UID 1000\nwpa_supplicant.service                                   loaded    active   running WPA supplicant\n\nLegend: LOAD   → Reflects whether the unit definition was properly loaded.\n        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.\n        SUB    → The low-level unit activation state, values depend on unit type.\n\n119 loaded units listed.\nTo show all installed unit files use 'systemctl list-unit-files'.\n",
+      "cpu_mem": "procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------\n r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu\n 3  0      0 1350192  12112 172332    0    0  3484    28 1369    7 24 20 55  2  0  0\n 1  1      0 1298516  15752 194380    0    0 23948   108 4659 6140 27 11 48 14  0  0\n",
+      "power": {
+        "capacity": "12",
+        "status": "Discharging",
+        "current_now": "-672000",
+        "voltage_now": "3574000"
+      }
+    },
+    "user_report": "可以了",
+    "physical_animation_and_desktop_confirmed": true,
+    "native_attachment_seconds": 1.72289,
+    "ring_check": {
+      "ring_pixel_comparisons": 49152,
+      "formats": [
+        16,
+        32
+      ],
+      "log_ink_preserved": true,
+      "sanitizers": "ASan+UBSan"
+    },
+    "remaining_issue": "Native direct-DMA framebuffer has no fb_dirty; skip unnecessary deferred damage requests before installation",
+    "persistent_installation": {
+      "state": "installed-readback-and-ordinary-boot-verified",
+      "kernel_sha256": "eb6933922d8c420bef3ab54b009dc02fcddb3ed0f449eba0cf5b748cd26e1fe3",
+      "initramfs_sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e",
+      "lnx_image_sha256": "1e938806a8af61fd26d7c85c0994fdd8394dd7303d71e5428802aa928a5cdbc2",
+      "lnx_partition_sha256": "2d86df8a7a38c3fa2d805fefd2dc6733b410d63769488252a49210d6ac9da45a",
+      "backup": "/srv/mocha-data/codex-debian-desktop/backups/boot-animation-20261025-before-install"
+    },
+    "damage_callback_fix": {
+      "reason": "drm_fb_helper_damage_area queued work without fb_dirty on direct-DMA scanout",
+      "change": "Notify deferred damage only when the active helper supplies fb_dirty; coherent direct scanout retains direct writes",
+      "renderer_check": {
+        "native_pixel_comparisons": 29325824,
+        "formats": [
+          "RGB565",
+          "XRGB8888",
+          "ARGB8888",
+          "XBGR8888"
+        ],
+        "padded_pitch": true,
+        "sanitizers": "ASan+UBSan"
+      },
+      "build": {
+        "emmc-config": {
+          "bytes": 55135,
+          "sha256": "e711ca4c559e3475e170f58fbdd74406475139a119d14eb18cbb80ecd17a2340"
+        },
+        "test-u-boot-dtbbin": {
+          "bytes": 1094608,
+          "sha256": "00513ec35e8e2310c98302fb6d85cd75c7c868a8b335c578d4a453382d132172"
+        },
+        "emmc-u-boot-dtbbin": {
+          "bytes": 1094704,
+          "sha256": "71b933c80db77a60a17381308e527ea31ac4751924156d1f7da27d558a3bf56a"
+        },
+        "emmc-u-boot": {
+          "bytes": 5611868,
+          "sha256": "b92d44b7b00c20ffd0996222525bd1876cc9b0a3a4e8d4986fc0c87d98e56b78"
+        },
+        "test-environment-check.json": {
+          "bytes": 148,
+          "sha256": "fd989b497fc2efb85c18f609ed5c8e8b8934ae36afcc00b5de79db7afb9d5c0d"
+        },
+        "test-u-boot": {
+          "bytes": 5611708,
+          "sha256": "288461631bbf42bc5cccd07002752b4e017ea56fcd84b94a3b085ec81801061d"
+        },
+        "uImage-moze-log-candidate": {
+          "bytes": 24770756,
+          "sha256": "eb6933922d8c420bef3ab54b009dc02fcddb3ed0f449eba0cf5b748cd26e1fe3"
+        },
+        "test-config": {
+          "bytes": 55140,
+          "sha256": "425e4fda6fc0288c868f8a5dc7b4c8324b8d5cee1ae3351efbd9f66b434177a7"
+        },
+        "initramfs-moze-log.cpio.gz": {
+          "bytes": 2786057,
+          "sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e"
+        },
+        "emmc-environment-check.json": {
+          "bytes": 143,
+          "sha256": "c045ad8e0d505c2e606095885316b712713315d2ac9eb2db88d5c9c6d862e9b2"
+        },
+        "kernel_release": "6.12.111-moze.1-native-vde2",
+        "physical_validation": "pending",
+        "layout": "bottom two-line powered by / debian plus icon; smooth forward-only ring; Moze at very bottom",
+        "input_sha256": "1a9ea12cff02b0d7f0e41cf67983cbdeae2700779ebe1656579674b30e89bdfd",
+        "test_image_sha256": "cebd2b9f240d8e79a74c5be70fdd79cad728bf663730566515eae7a6cbaa1d0b",
+        "emmc_image_sha256": "1e938806a8af61fd26d7c85c0994fdd8394dd7303d71e5428802aa928a5cdbc2",
+        "date": "2026-10-25",
+        "fix": "Native Mocha boot handoff; only notify deferred damage when fb_dirty exists"
+      },
+      "staging": {
+        "uImage-moze-log-candidate": {
+          "bytes": 24770756,
+          "sha256": "eb6933922d8c420bef3ab54b009dc02fcddb3ed0f449eba0cf5b748cd26e1fe3"
+        },
+        "initramfs-moze-log.cpio.gz": {
+          "bytes": 2786057,
+          "sha256": "4bc81a308ea6b8628f715c993fd334a1dd43ad65d0fe5b78ef4d5a9527b5f41e"
+        },
+        "default_kernel_and_initramfs_unchanged": true
+      },
+      "runtime_validation": {
+        "version": "Linux version 6.12.111-moze.1-native-vde2 (root@49c8ef86041b) (arm-linux-gnueabihf-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #9 SMP PREEMPT Sun Oct 25 03:59:20 UTC 2026",
+        "bootargs": "mem=1700M maxcpus=4 root=/dev/mmcblk0p26 rootfstype=ext4 rootwait rw console=ttyS0,115200n8 console=tty0 panic=30 loglevel=6 clk_ignore_unused regulator_ignore_unused earlycon=mochafb,moze mocha_boot_animation=1 mocha_desktop_requested=1 mocha_power_key_early=released cpuidle.off=1",
+        "boot_id": "6bb62872-e60e-4a41-99da-85e74f63db8f",
+        "native_attachment": [
+          "[    1.738618] Moze boot background attached to tegradrmfb (1536x2048, 32 bpp)"
+        ],
+        "niri": [
+          "571"
+        ],
+        "new_display_warning_absent": true,
+        "critical_errors": [],
+        "candidate_kernel_sha256": "eb6933922d8c420bef3ab54b009dc02fcddb3ed0f449eba0cf5b748cd26e1fe3",
+        "power": {
+          "/sys/class/power_supply/bq27520g4-0/capacity": "5",
+          "/sys/class/power_supply/bq27520g4-0/status": "Charging",
+          "/sys/class/power_supply/bq27520g4-0/voltage_now": "3740000",
+          "/sys/class/power_supply/bq27520g4-0/current_now": "409000",
+          "/sys/class/power_supply/bq24190-charger/online": "1",
+          "/sys/class/power_supply/bq24190-charger/status": "Charging"
+        }
+      }
+    },
+    "static_art_optimization": {
+      "periodic_damage_pixels": 4096,
+      "framebuffer_pixels": 3145728,
+      "static_avatar_redrawn_by_timer": false,
+      "native_console_damage_restores_background": true
+    }
+  }
+}

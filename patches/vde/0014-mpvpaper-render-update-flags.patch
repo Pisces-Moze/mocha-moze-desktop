@@ -1,0 +1,16 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -1481,7 +1481,12 @@
+             if (read(wakeup_fd, &tmp, sizeof(tmp)) == -1)
+                 break;
+ 
+-            mpv_render_context_update(mpv_glcontext);
++            /* Update callbacks can also signal internal work without a new
++             * video frame. Drain the callback, but do not damage the entire
++             * wallpaper surface unless libmpv requests a redraw. */
++            uint64_t updates = mpv_render_context_update(mpv_glcontext);
++            if (!(updates & MPV_RENDER_UPDATE_FRAME))
++                continue;
+ 
+             // Draw frame for all outputs
+             struct display_output *output, *tmp_output;

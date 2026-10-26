@@ -1,0 +1,19 @@
+{
+  "period": 300,
+  "number": 0,
+  "max.single.discard": 2,
+  "simultaneous-jobs": 1,
+  "audio": true,
+  "paused": true,
+  "pinned": true,
+  "form": true,
+  "online": true,
+  "notification.permission": true,
+  "battery": false,
+  "idle": false,
+  "go-hidden": false,
+  "memory-enabled": false,
+  "trash.unloaded": false,
+  "faqs": false,
+  "log": false
+}

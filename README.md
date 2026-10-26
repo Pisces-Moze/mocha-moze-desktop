@@ -1,5 +1,11 @@
 # Mocha Moze Desktop
 
+## 2026-10-27 源码同步
+
+本次汇总已经过实机阶段验证的桌面、壁纸生命周期、触屏输入、蓝牙面板、Mesa 和开机动画修改；各项证据及其限制保留在 `validation/`。新增的 [Pinyin 候选背景修复](tools/fix-fcitx-candidate-theme.py) 与候选条滚动复位仍待本轮实机安装确认。
+
+Firefox Request 解码补丁的完整构建因最终 Rust 链接进程被终止而中断，现按 Debian 支持的无 Rust LTO 配置重新构建；[构建及支持范围](tools/firefox-request/README.md)。尚未把浏览器端视频硬解列为实机通过。系统镜像与首次设置由 [Debian 总入口](https://github.com/Pisces-Moze/mocha-moze-debian/blob/main/docs/DISTRIBUTION.md) 管理。
+
 > 为跑 Debian armhf 的小米平板 1 提供横屏 Niri 桌面，以及与桌面方向一致的最小充电界面。
 
 [![License: GPL-2.0-only](https://img.shields.io/badge/License-GPL--2.0--only-blue.svg)](LICENSE)
@@ -10,7 +16,11 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 
 桌面这条线要解决的是软件渲染与横屏旋转叠加之后的显示问题：默认 Nouveau 走硬件着色器，但扫描输出仍是 simpledrm，所以有额外的显存搬运开销。充电这条线要解决的是另一件事——插着线开机时用户只想看到电量和能安全地回到桌面，不需要拉起整套会话。
 
-## 最新开发进度（2026-10-13）
+## 视频与内存进展（2026-10-23）
+
+Firefox 已安装可调整的 AVC 优先、缓存和进程默认值；同一 B 站视频恢复播放后，解码线程从 AV1 切换为 H.264。网页／渲染仍有明显 CPU 开销，Firefox 硬解尚未接通。配置、生效证据、限制与回退见 [浏览器性能记录](docs/BROWSER-PERFORMANCE.md)。独立播放器已使用 VDE Request 硬解；内置双扬声器也已由用户确认发声，持久安装详情见驱动仓库音频文档。下表和后续章节保留历史路径信息，以最新验证记录为准。
+
+## 原生桌面进展（2026-10-13）
 
 实机默认已切换到验证过的原生内核，正常开机、旋转后的桌面／触屏、中文输入与密码解锁已验收。完整 Nyxuri 配置和默认插件已部署；新增触屏手势、实体导航键、按键背光、手动键盘及参数设置，见 [实机触屏与 Nyxuri](docs/TABLET-NYXURI.md)。Noctalia ARM 插件初始化的内存对齐修复通过了 1,000 次真实 Luau 状态回归。下文 simpledrm／10 FPS 表述属于历史路径。
 
@@ -23,10 +33,10 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 | 横屏桌面（Niri + Noctalia + Firefox ESR） | 原生桌面及完整 Nyxuri 效果已实机运行；完整桌面帧率待持续测量 |
 | 横屏旋转 damage | 已用 0003 修复黑条与残影 |
 | native Tegra + Nouveau 输出 | 已默认使用，GPU／Niri 显示正常；WC 与 native-sync 修复已持久安装 |
-| 视频播放 | 软件 H.264 / Firefox 已验证 |
-| 硬件编解码 | 未完成 |
+| 视频播放 | Firefox 已验证软件 H.264；AVC 优先与低内存默认值已安装 |
+| 硬件编解码 | 独立播放器／壁纸已接入 VDE Request，格式覆盖及浏览器集成未完成 |
 | 最小充电模式 | 旋转、短暂拔插线唤醒、长按进入桌面已在本机确认；U-Boot 提前采样配套后插电按住冷启动直接进桌面 |
-| 音频硬件 | 无完整 RT5671 声卡，PipeWire 只证明服务在跑 |
+| 音频硬件 | 双扬声器已确认发声，保护固件与开机加载已持久安装；冷启动复测待完成 |
 
 ## 上游固定版本
 

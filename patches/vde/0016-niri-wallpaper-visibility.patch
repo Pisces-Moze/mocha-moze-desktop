@@ -1,0 +1,110 @@
+--- a/src/niri.rs
++++ b/src/niri.rs
+@@ -4881,9 +4881,13 @@
+         let xray_bg = xray.background[RenderTarget::Output as usize].borrow();
+         let xray_bd = xray.backdrop[RenderTarget::Output as usize].borrow();
+ 
++        let mut have_background = false;
++        let mut wallpaper_visible = false;
++        let mut shell_overlay_visible = false;
+         for layer in layer_map_for_output(output).layers() {
+             let surface = layer.wl_surface();
+             let is_background = layer.layer() == Layer::Background;
++            let shell_overlay = matches!(layer.namespace(), "noctalia-panel" | "noctalia-osd");
+ 
+             with_surfaces_surface_tree(surface, |surface, states| {
+                 let primary_scanout_output = states
+@@ -4913,6 +4917,13 @@
+                     }
+                 }
+ 
++                let visible = render_element_states.element_was_presented(id.clone());
++                if is_background {
++                    have_background = true;
++                    wallpaper_visible |= visible;
++                } else if shell_overlay {
++                    shell_overlay_visible |= visible;
++                }
+                 primary_scanout_output.update_from_render_element_states(
+                     id,
+                     output,
+@@ -4939,6 +4950,18 @@
+                 });
+             }
+         }
++
++        // Keep background animation alive throughout overview and shell panels.
++        // Otherwise use the same X-Ray-aware visibility as frame callbacks.
++        let overview = self.layout.is_overview_open();
++        let visible = if overview || shell_overlay_visible {
++            Some(true)
++        } else if have_background {
++            Some(wallpaper_visible)
++        } else {
++            None
++        };
++        crate::wallpaper_visibility::publish(&output.name(), visible, overview, shell_overlay_visible);
+ 
+         if let Some(surface) = &self.output_state[output].lock_surface {
+             with_surface_tree_downward(
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -27,3 +27,5 @@
+ 
+ #[cfg(test)]
+ mod tests;
++
++mod wallpaper_visibility;
+--- /dev/null
++++ b/src/wallpaper_visibility.rs
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++//! A session-local hint for background resource owners, not a rendering policy.
++//! Missing/unknown hints must leave the client running. Only transitions write
++//! a small atomic snapshot; the renderer never waits for a client or IPC reply.
++use std::cell::RefCell;
++use std::collections::HashMap;
++use std::io::Write;
++use std::os::unix::fs::OpenOptionsExt;
++use std::sync::atomic::{AtomicU64, Ordering};
++
++type Visibility = (Option<bool>, bool, bool);
++thread_local! {
++    static LAST: RefCell<HashMap<String, Visibility>> = RefCell::new(HashMap::new());
++}
++static SERIAL: AtomicU64 = AtomicU64::new(0);
++
++pub(crate) fn publish(output: &str, visible: Option<bool>, overview: bool, shell_overlay: bool) {
++    let state = (visible, overview, shell_overlay);
++    let changed = LAST.with(|last| {
++        let mut last = last.borrow_mut();
++        if last.get(output) == Some(&state) {
++            false
++        } else {
++            last.insert(output.to_owned(), state);
++            true
++        }
++    });
++    if !changed {
++        return;
++    }
++    let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR") else { return };
++    let encoded: String = output.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
++    let pid = std::process::id();
++    let path = std::path::PathBuf::from(runtime)
++        .join(format!("mocha-niri-background-{pid}-{encoded}.json"));
++    let incoming = path.with_extension(format!("incoming-{}", SERIAL.fetch_add(1, Ordering::Relaxed)));
++    let data = serde_json::json!({"schema": 1, "pid": pid, "output": output,
++        "visible": visible, "overview": overview, "shell_overlay": shell_overlay});
++    let result = (|| -> std::io::Result<()> {
++        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&incoming)?;
++        file.write_all(data.to_string().as_bytes())?;
++        drop(file);
++        std::fs::rename(&incoming, &path)
++    })();
++    if result.is_err() {
++        // Fail open. Another transition retries; filesystem errors cannot turn
++        // a rendering loop into a log/IO busy loop.
++        let _ = std::fs::remove_file(incoming);
++    }
++}

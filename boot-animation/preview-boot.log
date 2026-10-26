@@ -1,0 +1,70 @@
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 6.12.111-moze.1-native-vde2 (root@49c8ef86041b) (arm-linux-gnueabihf-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #3 SMP PREEMPT Sat Oct 17 13:18:08 UTC 2026
+[    0.000000] CPU: ARMv7 Processor [413fc0f3] revision 3 (ARMv7), cr=10c5387d
+[    0.000000] CPU: div instructions available: patching division code
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+[    0.000000] OF: fdt: Machine model: NVIDIA Tegra124 MOCHA
+[    0.000000] earlycon: mochafb0 at I/O port 0x0 (options '')
+[    0.000000] printk: legacy bootconsole [mochafb0] enabled
+[    0.000000] Memory policy: Data cache writealloc
+[    0.000000] cma: Reserved 64 MiB at 0xe6400000 on node -1
+[    0.000000] Zone ranges:
+[    0.000000]   Normal   [mem 0x0000000080000000-0x00000000afffffff]
+[    0.000000]   HighMem  [mem 0x00000000b0000000-0x00000000ea3fffff]
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x00000000ea3fffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000ea3fffff]
+[    0.000000] OF: reserved mem: 0xfd400000..0xfd5fffff (2048 KiB) nomap non-reusable pstore@fd400000
+[    0.000000] MOCHA_SMP: TLK reset dispatcher=0x40000000 status=0
+[    0.000000] earlycon: MOCHA_DIAG_STAGE_1: setup_arch returned
+[    0.000000] percpu: Embedded 18 pages/cpu s40972 r8192 d24564 u73728
+[    0.000000] pcpu-alloc: s40972 r8192 d24564 u73728 alloc=18*4096
+[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 
+[    0.000000] Kernel command line: mem=1700M maxcpus=4 root=/dev/mmcblk0p26 rootfstype=ext4 rootwait rw console=ttyS0,115200n8 console=tty0 panic=30 loglevel=6 clk_ignore_unused regulator_ignore_unused earlycon=mochafb mocha_desktop_requested=1 mocha_power_key_early=held cpuidle.off=1
+[    0.000000] Unknown kernel command line parameters "mocha_desktop_requested=1 mocha_power_key_early=held", will be passed to user space.
+[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 435200
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU event tracing is enabled.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 10 jiffies.
+[    0.000000] RCU Tasks: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.000000] RCU Tasks Trace: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.000000] NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
+[    0.000000] earlycon: MOCHA_DIAG_STAGE_2: before init_IRQ
+[    0.000000] /interrupt-controller@60004000: 160 interrupts forwarded to /interrupt-controller@50041000
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+[    0.000000] earlycon: MOCHA_DIAG_STAGE_3: before of_clk_init
+[    0.000000] MOCHA_DIAG: preserve boot PLLD source, base=0x4802850c
+[    0.000000] tegra124_clk_register_emc: no memory timings registered
+[    0.000000] earlycon: MOCHA_DIAG_STAGE_4: of_clk_init returned
+[    0.000000] clocksource: tegra_suspend_timer: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] arch_timer: cp15 timer(s) running at 12.00MHz (virt).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x2c47f4ee7, max_idle_ns: 440795202497 ns
+[    0.000001] sched_clock: 56 bits at 12MHz, resolution 83ns, wraps every 4398046511096ns
+[    0.000022] Switching to timer-based delay loop, resolution 83ns
+[    0.000117] earlycon: MOCHA_DIAG_STAGE_5: timer_probe returned
+[    0.000747] Console: colour dummy device 80x30
+[    0.000775] printk: legacy console [tty0] enabled
+[    0.000790] printk: legacy bootconsole [mochafb0] disabled
+[    0.000849] Calibrating delay loop (skipped), value calculated using timer frequency.. 24.00 BogoMIPS (lpj=120000)
+[    0.000873] CPU: Testing write buffer coherency: ok
+[    0.000940] CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+[    0.000972] CPU0: Spectre BHB: enabling loop workaround for all CPUs
+[    0.000984] pid_max: default: 32768 minimum: 301
+[    0.001190] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes, linear)
+[    0.001214] Mountpoint-cache hash table entries: 2048 (order: 1, 8192 bytes, linear)
+[    0.002128] /cpus/cpu@0 missing clock-frequency property
+[    0.002188] /cpus/cpu@1 missing clock-frequency property
+[    0.002238] /cpus/cpu@2 missing clock-frequency property
+[    0.002287] /cpus/cpu@3 missing clock-frequency property
+[    0.002318] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.004259] Setting up static identity map for 0x80100000 - 0x801000ac
+[    0.004460] rcu: Hierarchical SRCU implementation.
+[    0.004472] rcu: 	Max phase no-delay instances is 1000.

@@ -1,0 +1,27 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -64,7 +64,7 @@
+ local function pkillPattern(connector)
+   -- Escape POSIX ERE metacharacters in the connector name (e.g., '*' for wildcard).
+   local escaped = connector:gsub("([%.%*%+%?%(%)%[%]%^%$|\\{}])", "\\%1")
+-  return shellQuote("(^|/)mpvpaper .* " .. escaped .. " ")
++  return shellQuote("(^|/)mpvpaper(-holder)? .* " .. escaped .. " ")
+ end
+ 
+ -- Executes a function for every affected physical output.
+@@ -658,6 +658,15 @@
+     persist()
+     publish()
+ 
++  elseif event == "set-video" then
++    -- Shared entry point for the Nyxuri picker. Keep one owner of launch
++    -- flags, assignment persistence, hardware decoding and fullscreen release.
++    if type(payload) == "string" and payload ~= "" and noctalia.fileExists(payload) then
++      setVideo("*", payload)
++    else
++      noctalia.log("mpvpaper: set-video requires an existing video path")
++    end
++
+   elseif event == "clear" then
+     clearVideo(payload)
+ 

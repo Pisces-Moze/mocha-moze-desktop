@@ -1,0 +1,7 @@
+{
+  "policies": {
+    "Preferences": {
+      "dom.ipc.processPrelaunch.enabled": { "Value": false, "Status": "default" }
+    }
+  }
+}

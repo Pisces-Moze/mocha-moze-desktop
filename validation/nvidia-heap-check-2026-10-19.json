@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-19",
+  "user_reference": "https://docs.akass.cn/niri/Nvidia.html",
+  "reference_fetch": "timed out; inspected upstream original",
+  "upstream_reference": "https://github.com/niri-wm/niri/blob/main/docs/wiki/Nvidia.md",
+  "niri_version": "26.04",
+  "kernel_gpu_driver": "nouveau",
+  "userspace_driver": "Mesa Gallium 25.0.7 Tegra",
+  "live_gallium_sha256": "cc81fe6399af38442a48aa52801400086dcb43008aae292353ebac4d65c57fbe",
+  "proprietary_nvidia_modules_present": false,
+  "proprietary_nvidia_egl_glx_libraries_mapped": false,
+  "GLVidHeapReuseRatio_applicable": false,
+  "old_pipewire_wait_debug_flag_added": false,
+  "dma_buf_before": {
+    "count": 14,
+    "bytes": 91148288
+  },
+  "dma_buf_closed_baseline": {
+    "count": 15,
+    "bytes": 91152384
+  },
+  "dma_buf_after_six_control_center_cycles": {
+    "count": 14,
+    "bytes": 91148288
+  },
+  "niri_rss_kib": 57808,
+  "measurement_scope": "global shared DMA-BUF, not per-process VRAM",
+  "observed_growth_in_short_test": false,
+  "long_term_leak_excluded": false
+}

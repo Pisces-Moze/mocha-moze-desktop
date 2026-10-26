@@ -1,0 +1,86 @@
+--- a/src/dbus/bluetooth/bluetooth_agent.cpp
++++ b/src/dbus/bluetooth/bluetooth_agent.cpp
+@@ -331,6 +331,12 @@
+   }
+ }
+ 
++void BluetoothAgent::finishPairingDisplay(const std::string& devicePath) {
++  if (m_impl != nullptr) {
++    m_impl->finishDisplayFor(sdbus::ObjectPath{devicePath});
++  }
++}
++
+ bool BluetoothAgent::hasPendingRequest() const noexcept { return m_impl != nullptr && m_impl->hasPending(); }
+ 
+ BluetoothPairingRequest BluetoothAgent::pendingRequest() const {
+--- a/src/dbus/bluetooth/bluetooth_agent.h
++++ b/src/dbus/bluetooth/bluetooth_agent.h
+@@ -52,6 +52,7 @@
+   void submitPin(const std::string& pin);    // PinCode kind
+   void submitPasskey(std::uint32_t passkey); // Passkey kind
+   void cancelPending();
++  void finishPairingDisplay(const std::string& devicePath);
+ 
+   [[nodiscard]] bool hasPendingRequest() const noexcept;
+   [[nodiscard]] BluetoothPairingRequest pendingRequest() const;
+--- a/src/dbus/bluetooth/bluetooth_service.cpp
++++ b/src/dbus/bluetooth/bluetooth_service.cpp
+@@ -762,6 +762,40 @@
+               dev->connecting = false;
+               emitDevices();
+             }
++            return;
++          }
++          // Pair authenticates but does not establish the HID/audio profile.
++          // Only the explicitly selected, successfully paired device is trusted.
++          auto* pairedProxy = m_impl->deviceProxy(devicePath);
++          if (pairedProxy == nullptr) {
++            return;
++          }
++          try {
++            pairedProxy->setPropertyAsync("Trusted")
++                .onInterface(kDeviceInterface)
++                .toValue(true)
++                .uponReplyInvoke([this, devicePath](std::optional<sdbus::Error> trustError) {
++                  if (trustError.has_value()) {
++                    kLog.warn("Trust after pairing failed {}: {}", devicePath, trustError->what());
++                    if (auto* dev = findDevice(devicePath)) {
++                      dev->connecting = false;
++                      emitDevices();
++                    }
++                    return;
++                  }
++                  if (auto* dev = findDevice(devicePath); dev != nullptr && dev->connected) {
++                    dev->connecting = false;
++                    emitDevices();
++                  } else {
++                    connect(devicePath);
++                  }
++                });
++          } catch (const sdbus::Error& e) {
++            kLog.warn("Trust after pairing dispatch failed {}: {}", devicePath, e.what());
++            if (auto* dev = findDevice(devicePath)) {
++              dev->connecting = false;
++              emitDevices();
++            }
+           }
+         });
+     return true;
+--- a/src/app/application_services.cpp
++++ b/src/app/application_services.cpp
+@@ -1358,7 +1358,14 @@
+             refreshBluetoothUi();
+           }
+       );
+-      m_bluetoothService->setDevicesCallback([refreshBluetoothUi](const std::vector<BluetoothDeviceInfo>& /*devices*/) {
++      m_bluetoothService->setDevicesCallback([this, refreshBluetoothUi](const std::vector<BluetoothDeviceInfo>& devices) {
++        if (m_bluetoothAgent != nullptr) {
++          for (const auto& device : devices) {
++            if (device.paired) {
++              m_bluetoothAgent->finishPairingDisplay(device.path);
++            }
++          }
++        }
+         refreshBluetoothUi();
+       });
+       if (m_bluetoothService->hasStateSnapshot()) {

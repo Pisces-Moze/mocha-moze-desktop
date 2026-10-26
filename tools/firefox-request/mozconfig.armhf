@@ -1,0 +1,29 @@
+mk_add_options MOZ_OBJDIR=@OBJDIR@
+mk_add_options MOZ_MAKE_FLAGS=-j1
+ac_add_options --enable-project=browser
+ac_add_options --target=armv7-unknown-linux-gnueabihf
+ac_add_options --enable-default-toolkit=cairo-gtk3-wayland
+ac_add_options --with-app-name=firefox-esr
+ac_add_options --enable-release
+ac_add_options --disable-bootstrap
+ac_add_options --disable-tests
+ac_add_options --disable-debug-symbols
+ac_add_options --disable-updater
+ac_add_options --enable-linker=lld
+ac_add_options --with-system-nspr
+ac_add_options --enable-system-ffi
+ac_add_options --with-system-zlib
+ac_add_options --enable-alsa
+export CC=clang-19
+export CXX=clang++-19
+export HOST_CC=clang-19
+export HOST_CXX=clang++-19
+export RUSTC=/usr/bin/rustc
+export CARGO=/usr/bin/cargo
+export CBINDGEN=/usr/bin/cbindgen
+export PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
+export CARGO_BUILD_JOBS=1
+# Debian's rust.mk supports this override. Avoid a final monolithic Rust LTO
+# link in a memory-limited cross-build container; runtime sandboxing is intact.
+export DEBIAN_RUST_LTO=-Clto=off
+export RUSTFLAGS="-C debuginfo=0"

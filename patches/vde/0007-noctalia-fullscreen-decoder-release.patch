@@ -1,0 +1,119 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -152,7 +152,9 @@
+ local function mpvOptions(connector)
+   local parts = { "loop-file=inf", "panscan=1.0" }
+   if cfg("mute") then table.insert(parts, "no-audio") end
+-  table.insert(parts, "hwdec=" .. (cfg("hardware_decode") and "auto" or "no"))
++  local backend = cfg("hardware_backend")
++  if backend ~= "v4l2request" and backend ~= "v4l2request-copy" then backend = "auto" end
++  table.insert(parts, "hwdec=" .. (cfg("hardware_decode") and backend or "no"))
+   table.insert(parts, "input-ipc-server=" .. ipcSocketPath(connector))
+ 
+   local extra = cfg("mpv_options")
+@@ -183,7 +185,12 @@
+ 
+   if mpvpaperSupportsAutoMode then
+     if mode == "max" then return "--auto-pause --auto-mode MAX" end
+-    if mode == "full" then return "--auto-pause --auto-mode FULL" end
++    if mode == "full" then
++      if cfg("release_when_fullscreen") then
++        return "--auto-stop --auto-mode FULL"
++      end
++      return "--auto-pause --auto-mode FULL"
++    end
+   end
+ 
+   -- mpvpaper ≤ 1.8 fallback: only plain --auto-pause exists.
+--- a/plugin.toml
++++ b/plugin.toml
+@@ -50,6 +50,27 @@
+   { value = "max", label_key = "settings.auto_pause.options.max" },
+   { value = "full", label_key = "settings.auto_pause.options.full" },
+ ]
++
++[[setting]]
++key = "hardware_backend"
++type = "select"
++label_key = "settings.hardware_backend.label"
++description_key = "settings.hardware_backend.description"
++default = "auto"
++options = [
++  { value = "auto", label_key = "settings.hardware_backend.options.auto" },
++  { value = "v4l2request", label_key = "settings.hardware_backend.options.request" },
++  { value = "v4l2request-copy", label_key = "settings.hardware_backend.options.copy" },
++]
++visible_when = { key = "hardware_decode", values = ["true"] }
++
++[[setting]]
++key = "release_when_fullscreen"
++type = "bool"
++label_key = "settings.release_when_fullscreen.label"
++description_key = "settings.release_when_fullscreen.description"
++default = true
++visible_when = { key = "auto_pause", values = ["full"] }
+ 
+ [[setting]]
+ key = "mpv_options"
+--- a/translations/en.json
++++ b/translations/en.json
+@@ -32,7 +32,7 @@
+       "label": "Glyph"
+     },
+     "hardware_decode": {
+-      "description": "Use GPU video decoding (mpv hwdec=auto)",
++      "description": "Use a hardware video decoder when supported (mpv hwdec=auto)",
+       "label": "Hardware Decoding"
+     },
+     "memory_max": {
+@@ -55,6 +55,19 @@
+     "video_directory": {
+       "description": "Folder scanned for wallpaper videos; defaults to ~/Videos when empty",
+       "label": "Video Directory"
++    },
++    "release_when_fullscreen": {
++      "label": "Release decoder memory in fullscreen",
++      "description": "Unload video buffers while a focused fullscreen app covers the desktop. Resume at the saved position afterwards; panels and overview do not trigger this policy."
++    },
++    "hardware_backend": {
++      "label": "Hardware decoder backend",
++      "description": "Tegra124 Request requires the matching driver and player; currently supports progressive H.264 CAVLC. Auto keeps the player compatibility selection.",
++      "options": {
++        "auto": "Auto",
++        "request": "Tegra124 Request (DMA-BUF)",
++        "copy": "Tegra124 Request (CPU copy)"
++      }
+     }
+   },
+   "slideshow": "Slideshow",
+--- a/translations/zh-Hans.json
++++ b/translations/zh-Hans.json
+@@ -32,7 +32,7 @@
+       "label": "图标"
+     },
+     "hardware_decode": {
+-      "description": "使用 GPU 解码视频（mpv hwdec=auto）",
++      "description": "支持时使用硬件视频解码引擎（mpv hwdec=auto）",
+       "label": "硬件解码"
+     },
+     "memory_max": {
+@@ -55,6 +55,19 @@
+     "video_directory": {
+       "description": "用于扫描壁纸视频的文件夹；留空时使用 ~/Videos",
+       "label": "视频目录"
++    },
++    "release_when_fullscreen": {
++      "label": "全屏时释放解码资源",
++      "description": "前台全屏应用覆盖桌面时释放视频缓冲，离开后从原位置继续。弹窗和概览不会触发此策略。"
++    },
++    "hardware_backend": {
++      "label": "硬件解码后端",
++      "description": "Tegra124 Request 需匹配驱动和播放器；当前支持 H.264 逐行 CAVLC 视频。自动模式保留播放器的兼容选择。",
++      "options": {
++        "auto": "自动",
++        "request": "Tegra124 Request (DMA-BUF)",
++        "copy": "Tegra124 Request (CPU copy)"
++      }
+     }
+   },
+   "slideshow": "幻灯片放映",

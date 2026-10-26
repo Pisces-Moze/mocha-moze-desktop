@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-21",
+  "status": "physical_menu_and_wifi_input_passed",
+  "source": "tablet/mocha-touch-keyboard.py",
+  "installed_sha256": "0a4f28fba148897953171d3abdec1234634713df05d5405b408a76067fe74ea1",
+  "noctalia_binary_sha256": "26d92d5975c47c69558fbdf0fcbe46681350646e34d9ccab02ddd772a12e2b71",
+  "patch": "0021-noctalia-touch-keyboard-input-region.patch",
+  "patch_sha256": "511fe5b830fd3e01da0b56bd18b115f9bf087ba04452549ea3b6bae2e9c8e4e9",
+  "change": "Exclude keyboard/candidate rectangles from the panel click shield, and retain OnDemand panel text focus when touching the two non-focusable OSK namespaces.",
+  "retained": [
+    "GtkLayerShell.KeyboardMode.NONE",
+    "set_accept_focus(False)",
+    "floating Chinese candidates",
+    "theme and touch feedback"
+  ],
+  "verification": {
+    "python_ast": "passed",
+    "live_keyboard_hash_matches_source": true,
+    "native_geometry_parser_asan_ubsan": "passed",
+    "rotated_logical_monitor": [
+      0,
+      0,
+      1365,
+      1024
+    ],
+    "live_keyboard_rectangle": {
+      "width": 1365,
+      "height": 255,
+      "bottom": 0
+    },
+    "armhf_build": "passed",
+    "download_and_stage_hash": "matched",
+    "dependency_and_config_checks": "passed",
+    "post_install_shell_health": {
+      "barVisible": true,
+      "locked": false
+    },
+    "physical_menu_search": "user_confirmed_passed",
+    "physical_wifi_password": "user_confirmed_passed_after_niri_focus_fix",
+    "usb_recovery": {
+      "shell_sha_matches_candidate": true,
+      "keyboard_service": "active",
+      "shell_service": "active",
+      "active_panel": "launcher",
+      "panel_open": true,
+      "session_locked": false,
+      "kernel_unchanged": true,
+      "wifi_device_state": "connected",
+      "new_gpu_fault_logged": false
+    },
+    "native_focus_tests": 3,
+    "physical_wifi_test_niri_sha256": "e138f981ab49d798bbc94453ca3271078fcb0da8916051c20a2595444fa45491",
+    "final_niri_focus_source_unchanged": true
+  },
+  "limits": [
+    "Overlay layer order and click-shield exclusion alone fixed search but left Wi-Fi OnDemand focus broken. The compositor focus patch is additionally required.",
+    "Only non-focusable mocha-touch-keyboard and mocha-pinyin-candidates retain existing OnDemand focus; ordinary bars and other surfaces retain the prior policy.",
+    "No keyboard input, preedit, candidate text or passwords are logged in the geometry file.",
+    "The independent workspace rounding update retains exactly the same focus fix; the final binary was verified again after recovery. The cause of the earlier black screen/USB loss remains undetermined."
+  ],
+  "niri_binary_sha256": "8b9e73b512229a1649464e0c4de538f04115c52edfdfe733c2831c290e9af068",
+  "focus_patch": "0022-niri-touch-keyboard-focus.patch",
+  "focus_patch_sha256": "d3fe1cff36f4b722d6726801c9ca58263d8efedee0a5b83de008ff1c195a4177"
+}

@@ -1,0 +1,62 @@
+--- a/libavutil/hwcontext_v4l2request.c
++++ b/libavutil/hwcontext_v4l2request.c
+@@ -1100,6 +1100,26 @@
+     return ret;
+ }
+ 
++/* Some tiled formats use planar sw_format names as bit-depth hints only.
++ * Enable CPU mapping for real linear planar buffers without enabling raw
++ * downloads of Allwinner/Broadcom/AFBC block layouts.
++ */
++static int v4l2request_format_is_mappable(AVHWFramesContext *hwfc)
++{
++    AVV4L2RequestFramesContext *fctx = hwfc->hwctx;
++    AVV4L2RequestFramesContextInternal *fctxi = fctx->internal;
++
++    if (hwfc->sw_format == AV_PIX_FMT_YUV420P) {
++        const struct v4l2_format *format = &fctxi->capture.format;
++        return V4L2_TYPE_IS_MULTIPLANAR(format->type) &&
++               (format->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_YUV420M ||
++                format->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_YVU420M);
++    }
++    return hwfc->sw_format != AV_PIX_FMT_NONE &&
++           hwfc->sw_format != AV_PIX_FMT_YUV420P10 &&
++           hwfc->sw_format != AV_PIX_FMT_YUV422P10;
++}
++
+ static int v4l2request_transfer_get_formats(AVHWFramesContext *hwfc,
+                                             enum AVHWFrameTransferDirection dir,
+                                             enum AVPixelFormat **formats)
+@@ -1116,9 +1136,7 @@
+     fmts[0] = hwfc->sw_format;
+     fmts[1] = AV_PIX_FMT_NONE;
+ 
+-    if (hwfc->sw_format == AV_PIX_FMT_YUV420P ||
+-        hwfc->sw_format == AV_PIX_FMT_YUV420P10 ||
+-        hwfc->sw_format == AV_PIX_FMT_YUV422P10)
++    if (!v4l2request_format_is_mappable(hwfc))
+         fmts[0] = AV_PIX_FMT_NONE;
+ 
+     *formats = fmts;
+@@ -1130,6 +1148,9 @@
+ {
+     AVFrame *map;
+     int ret;
++
++    if (!v4l2request_format_is_mappable(hwfc))
++        return AVERROR(ENOSYS);
+ 
+     if (dst->width > hwfc->width || dst->height > hwfc->height)
+         return AVERROR(EINVAL);
+@@ -1164,10 +1185,7 @@
+     if (!(flags & AV_HWFRAME_MAP_READ))
+         return AVERROR(ENOSYS);
+ 
+-    if (hwfc->sw_format == AV_PIX_FMT_NONE ||
+-        hwfc->sw_format == AV_PIX_FMT_YUV420P ||
+-        hwfc->sw_format == AV_PIX_FMT_YUV420P10 ||
+-        hwfc->sw_format == AV_PIX_FMT_YUV422P10)
++    if (!v4l2request_format_is_mappable(hwfc))
+         return AVERROR(ENOSYS);
+     else if (dst->format == AV_PIX_FMT_NONE)
+         dst->format = hwfc->sw_format;

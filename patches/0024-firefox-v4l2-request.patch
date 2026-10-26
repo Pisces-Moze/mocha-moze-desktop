@@ -1,0 +1,451 @@
+--- a/dom/media/platforms/ffmpeg/FFmpegDecoderModule.h
++++ b/dom/media/platforms/ffmpeg/FFmpegDecoderModule.h
+@@ -96,7 +96,9 @@
+ #    if LIBAVCODEC_VERSION_MAJOR >= 55
+         {AV_CODEC_ID_HEVC, gfx::gfxVars::UseHEVCHwDecode()},
+ #    endif
+-        {AV_CODEC_ID_H264, gfx::gfxVars::UseH264HwDecode()},
++        {AV_CODEC_ID_H264, gfx::gfxVars::UseH264HwDecode() ||
++                               !!FFmpegVideoDecoder<V>::FindV4L2RequestAVCodec(
++                                   aLib, AV_CODEC_ID_H264)},
+ #  endif
+ #  ifdef MOZ_WIDGET_ANDROID
+         // These proprietary codecs can only be decoded via MediaCodec decoders,
+@@ -128,6 +130,9 @@
+           }
+         }
+ 
++        if (!codec) {
++          codec = FFmpegVideoDecoder<V>::FindV4L2RequestAVCodec(aLib, entry.mId);
++        }
+         if (!codec) {
+           MOZ_LOG_FMT(sPDMLog, LogLevel::Debug, "No hw codec or decoder for {}",
+                       AVCodecToString(entry.mId));
+@@ -285,7 +290,18 @@
+           break;
+       }
+ #else
++#  if defined(MOZ_WIDGET_GTK) && defined(MOZ_ENABLE_V4L2)
++      // A Request-only probe does not imply arbitrary H264 profile support.
++      // Keep the software support above for CABAC or absent stream metadata.
++      if (codecId != AV_CODEC_ID_H264 || gfx::gfxVars::UseH264HwDecode() ||
++          (trackInfo.GetAsVideoInfo() &&
++           FFmpegVideoDecoder<V>::SupportsV4L2RequestConfig(
++               *trackInfo.GetAsVideoInfo()))) {
++        supports += media::DecodeSupport::HardwareDecode;
++      }
++#  else
+       supports += media::DecodeSupport::HardwareDecode;
++#  endif
+ #endif
+     }
+ 
+--- /dev/null
++++ b/dom/media/platforms/ffmpeg/FFmpegV4L2Request.h
+@@ -0,0 +1,77 @@
++/* This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef FFmpegV4L2Request_h_
++#define FFmpegV4L2Request_h_
++
++#include <cstdint>
++#include <limits>
++
++// The caller supplies FFmpeg's DRM and VA DRM descriptor definitions. Keeping
++// this conversion independent of Gecko lets the exact production code run in
++// the standalone sanitizer test, with the real upstream descriptor layouts.
++namespace mozilla {
++
++inline bool ConvertV4L2RequestYUV420(
++    const AVDRMFrameDescriptor& aDesc, int aWidth, int aHeight,
++    uint64_t aCropRight, uint64_t aCropBottom,
++    VADRMPRIMESurfaceDescriptor& aResult) {
++  if (aWidth <= 0 || aHeight <= 0 || aCropRight >= uint64_t(aWidth) ||
++      aCropBottom >= uint64_t(aHeight) || aDesc.nb_layers != 1 ||
++      aDesc.nb_objects < 1 || aDesc.nb_objects > 4 ||
++      aDesc.layers[0].format != DRM_FORMAT_YUV420 ||
++      aDesc.layers[0].nb_planes != 3) {
++    return false;
++  }
++
++  VADRMPRIMESurfaceDescriptor out{};
++  out.fourcc = VA_FOURCC_I420;
++  out.width = aWidth - aCropRight;
++  out.height = aHeight - aCropBottom;
++  out.num_objects = aDesc.nb_objects;
++  out.num_layers = 3;
++  for (int i = 0; i < aDesc.nb_objects; ++i) {
++    const auto& obj = aDesc.objects[i];
++    if (obj.fd < 0 || !obj.size ||
++        obj.size > std::numeric_limits<uint32_t>::max()) {
++      return false;
++    }
++    out.objects[i].fd = obj.fd;
++    out.objects[i].size = obj.size;
++    out.objects[i].drm_format_modifier = obj.format_modifier;
++  }
++  for (int i = 0; i < 3; ++i) {
++    const auto& plane = aDesc.layers[0].planes[i];
++    if (plane.object_index < 0 || plane.object_index >= aDesc.nb_objects ||
++        plane.offset < 0 || plane.pitch <= 0 ||
++        uint64_t(plane.offset) > std::numeric_limits<uint32_t>::max() ||
++        uint64_t(plane.pitch) > std::numeric_limits<uint32_t>::max()) {
++      return false;
++    }
++    const uint64_t columns = i ? (uint64_t(aWidth) + 1) / 2 : aWidth;
++    const uint64_t rows = i ? (uint64_t(aHeight) + 1) / 2 : aHeight;
++    const uint64_t size = aDesc.objects[plane.object_index].size;
++    const uint64_t offset = plane.offset;
++    const uint64_t pitch = plane.pitch;
++    // Use division and subtraction so even malicious descriptor dimensions
++    // cannot overflow a pitch*height or offset+extent calculation.
++    if (pitch < columns || offset > size || columns > size - offset ||
++        rows - 1 > (size - offset - columns) / pitch) {
++      return false;
++    }
++    auto& layer = out.layers[i];
++    layer.drm_format = DRM_FORMAT_R8;
++    layer.num_planes = 1;
++    layer.object_index[0] = plane.object_index;
++    layer.offset[0] = plane.offset;
++    layer.pitch[0] = plane.pitch;
++  }
++  // No fd duplication or ownership transfer here. Gecko's DMABufSurface
++  // duplicates the fds, and VideoFrameSurface retains FFmpeg's frame buffer.
++  aResult = out;
++  return true;
++}
++
++}  // namespace mozilla
++#endif
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp
+@@ -692,6 +692,46 @@
+ }
+ #  endif
+ 
++MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2RequestDecoder() {
++#if defined(MOZ_ENABLE_V4L2) && LIBAVCODEC_VERSION_MAJOR >= 58 && \
++    !defined(FFVPX_VERSION)
++  if (!SupportsV4L2RequestConfig(mInfo)) {
++    return NS_ERROR_NOT_AVAILABLE;
++  }
++  AVHWDeviceType deviceType = AV_HWDEVICE_TYPE_NONE;
++  AVCodec* codec = FindV4L2RequestAVCodec(mLib, mCodecID, &deviceType);
++  if (!codec) {
++    return NS_ERROR_NOT_AVAILABLE;
++  }
++  StaticMutexAutoLock mon(sMutex);
++  if (!(mCodecContext = mLib->avcodec_alloc_context3(codec))) {
++    return NS_ERROR_OUT_OF_MEMORY;
++  }
++  mCodecContext->opaque = this;
++  InitHWCodecContext(ContextType::V4L2);
++  mCodecContext->apply_cropping = 0;
++  auto releaseDecoder = MakeScopeExit(
++      [&]() MOZ_NO_THREAD_SAFETY_ANALYSIS { ReleaseCodecContext(); });
++  MediaResult rv = AllocateExtraData();
++  if (NS_FAILED(rv)) {
++    return rv;
++  }
++  if (mLib->av_hwdevice_ctx_create(&mCodecContext->hw_device_ctx, deviceType,
++                                  nullptr, nullptr, 0) < 0 ||
++      mLib->avcodec_open2(mCodecContext, codec, nullptr) < 0) {
++    FFMPEG_LOG("V4L2 Request initialization failed; retaining SW fallback");
++    return NS_ERROR_NOT_AVAILABLE;
++  }
++  AdjustHWDecodeLogging();
++  mUsingV4L2 = mUsingV4L2Request = true;
++  releaseDecoder.release();
++  FFMPEG_LOG("V4L2 Request codec opened (DRM PRIME output required)");
++  return NS_OK;
++#else
++  return NS_ERROR_NOT_AVAILABLE;
++#endif
++}
++
+ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
+   FFMPEG_LOG("Initialising V4L2-DRM FFmpeg decoder");
+ 
+@@ -837,6 +877,10 @@
+   switch (mCodecID) {
+     case AV_CODEC_ID_H264:
+       supported = gfx::gfxVars::UseH264HwDecode();
++#    if defined(MOZ_WIDGET_GTK) && defined(MOZ_ENABLE_V4L2)
++      supported |= SupportsV4L2RequestConfig(mInfo) &&
++                   !!FindV4L2RequestAVCodec(mLib, mCodecID);
++#    endif
+       break;
+     case AV_CODEC_ID_VP8:
+       supported = gfx::gfxVars::UseVP8HwDecode();
+@@ -956,7 +1000,11 @@
+ #  endif  // MOZ_ENABLE_VAAPI
+ 
+ #  ifdef MOZ_ENABLE_V4L2
+-  // VAAPI didn't work or is disabled, so try V4L2 with DRM
++  // Stateless Request hwaccels use the H264 parser with an AVHWDeviceContext;
++  // they are not the stateful h264_v4l2m2m wrapper decoder.
++  if (NS_SUCCEEDED(InitV4L2RequestDecoder())) {
++    return;
++  }
+   if (NS_SUCCEEDED(InitV4L2Decoder())) {
+     return;
+   }
+@@ -3233,6 +3281,65 @@
+ #endif  // MOZ_WIDGET_ANDROID
+ 
+ #if MOZ_USE_HWDECODE
++/* static */ AVCodec* FFmpegVideoDecoder<LIBAV_VER>::FindV4L2RequestAVCodec(
++    const FFmpegLibWrapper* aLib, AVCodecID aCodec,
++    AVHWDeviceType* aDeviceType) {
++#if defined(MOZ_WIDGET_GTK) && defined(MOZ_ENABLE_V4L2) && \
++    LIBAVCODEC_VERSION_MAJOR >= 58 && !defined(FFVPX_VERSION)
++  if (!StaticPrefs::media_ffmpeg_v4l2_request_enabled() ||
++      !StaticPrefs::media_hardware_video_decoding_enabled_AtStartup() ||
++      aCodec != AV_CODEC_ID_H264 || !aLib->avcodec_get_hw_config ||
++      !aLib->av_hwdevice_get_type_name || !aLib->av_hwdevice_ctx_create) {
++    return nullptr;
++  }
++  AVCodec* codec = aLib->avcodec_find_decoder(aCodec);
++  if (!codec) {
++    return nullptr;
++  }
++  for (int i = 0;; ++i) {
++    const AVCodecHWConfig* config = aLib->avcodec_get_hw_config(codec, i);
++    if (!config) {
++      break;
++    }
++    const char* name = aLib->av_hwdevice_get_type_name(config->device_type);
++    if (config->pix_fmt == AV_PIX_FMT_DRM_PRIME &&
++        (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) && name &&
++        !strcmp(name, "v4l2request")) {
++      if (aDeviceType) {
++        *aDeviceType = config->device_type;
++      }
++      return codec;
++    }
++  }
++#endif
++  return nullptr;
++}
++
++/* static */ bool FFmpegVideoDecoder<LIBAV_VER>::SupportsV4L2RequestConfig(
++    const VideoInfo& aInfo) {
++#if defined(MOZ_WIDGET_GTK) && defined(MOZ_ENABLE_V4L2) && \
++    LIBAVCODEC_VERSION_MAJOR >= 58 && !defined(FFVPX_VERSION)
++  if (!StaticPrefs::media_ffmpeg_v4l2_request_enabled() ||
++      !StaticPrefs::media_hardware_video_decoding_enabled_AtStartup() ||
++      GetCodecId(aInfo.mMimeType) != AV_CODEC_ID_H264) {
++    return false;
++  }
++  SPSData sps;
++  // Initial hardware scope: progressive constrained Baseline, 8-bit 4:2:0.
++  // VDE does not implement CABAC. Do not advertise Main/High as accelerated
++  // or feed unsupported 8x8 transforms to it. Missing SPS means SW fallback.
++  return H264::DecodeSPSFromExtraData(aInfo.mExtraData, sps) && sps.valid &&
++         sps.profile_idc == H264_PROFILE_BASE && sps.constraint_set1_flag &&
++         sps.chroma_format_idc == 1 && !sps.bit_depth_luma_minus8 &&
++         !sps.bit_depth_chroma_minus8 && sps.frame_mbs_only_flag &&
++         !sps.crop_left && !sps.crop_top && sps.pic_width_in_mbs > 0 &&
++         sps.pic_width_in_mbs <= 128 && sps.pic_height_in_map_units > 0 &&
++         sps.pic_height_in_map_units <= 128 && sps.max_num_ref_frames <= 16;
++#else
++  return false;
++#endif
++}
++
+ /* static */ AVCodec* FFmpegVideoDecoder<LIBAV_VER>::FindVideoHardwareAVCodec(
+     const FFmpegLibWrapper* aLib, AVCodecID aCodec,
+     AVHWDeviceType aDeviceType) {
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+@@ -103,6 +103,11 @@
+ #ifdef USING_MOZFFVPX
+     return "ffvpx video decoder"_ns;
+ #else
++#  if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
++    if (mUsingV4L2Request) {
++      return "ffmpeg V4L2 Request video decoder"_ns;
++    }
++#  endif
+     return "ffmpeg video decoder"_ns;
+ #endif
+   }
+@@ -187,6 +192,12 @@
+ 
+ #ifdef MOZ_USE_HWDECODE
+  public:
++  // Opt-in stateless Tegra VDE path. Probe by FFmpeg's runtime device name;
++  // the out-of-tree device enum must never be hard-coded into Gecko.
++  static AVCodec* FindV4L2RequestAVCodec(const FFmpegLibWrapper* aLib,
++                                        AVCodecID aCodec,
++                                        AVHWDeviceType* aDeviceType = nullptr);
++  static bool SupportsV4L2RequestConfig(const VideoInfo& aInfo);
+   static AVCodec* FindVideoHardwareAVCodec(
+       const FFmpegLibWrapper* aLib, AVCodecID aCodec,
+       AVHWDeviceType aDeviceType = AV_HWDEVICE_TYPE_NONE);
+@@ -248,6 +259,7 @@
+   bool IsLinuxHDR() const;
+   MediaResult InitVAAPIDecoder();
+   MediaResult InitV4L2Decoder();
++  MediaResult InitV4L2RequestDecoder();
+ #  if LIBAVCODEC_VERSION_MAJOR >= 60 && !defined(FFVPX_VERSION)
+   MediaResult InitVulkanDecoder();
+ 
+@@ -293,6 +305,7 @@
+   bool mVulkanTilingSettled = false;
+ #  endif
+   bool mUsingV4L2 = false;
++  bool mUsingV4L2Request = false;
+   // If video overlay is used we want to upload SW decoded frames to
+   // DMABuf and present it as a external texture to rendering pipeline.
+   bool mUploadSWDecodeToDMABuf = false;
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
+@@ -18,6 +18,7 @@
+ #  undef DRM_FORMAT_MOD_INVALID
+ #endif
+ #include <libdrm/drm_fourcc.h>
++#include "FFmpegV4L2Request.h"
+ 
+ #ifdef MOZ_LOGGING
+ #  undef DMABUF_LOG
+@@ -449,6 +450,20 @@
+   if (aAVFrame->crop_top != 0 || aAVFrame->crop_left != 0) {
+     DMABUF_LOG("Top and left-side cropping are not supported");
+     return Nothing();
++  }
++
++  if (aDesc.nb_layers < 1 || aDesc.nb_layers > 4 ||
++      aDesc.nb_objects < 1 || aDesc.nb_objects > 4) {
++    return Nothing();
++  }
++  if (aDesc.layers[0].format == DRM_FORMAT_YUV420 &&
++      aDesc.layers[0].nb_planes != 1) {
++    if (!ConvertV4L2RequestYUV420(aDesc, aAVFrame->width, aAVFrame->height,
++                                 aAVFrame->crop_right, aAVFrame->crop_bottom,
++                                 vaDesc)) {
++      return Nothing();
++    }
++    return Some(vaDesc);
+   }
+ 
+   // Width and height after crop
+--- a/modules/libpref/init/StaticPrefList.yaml
++++ b/modules/libpref/init/StaticPrefList.yaml
+@@ -12592,6 +12592,13 @@
+     mirror: always
+ #endif
+ 
++# Experimental stateless V4L2 Request support (system FFmpeg only).
++# Kept off until the matched browser and FFmpeg pass physical playback checks.
++- name: media.ffmpeg.v4l2-request.enabled
++  type: RelaxedAtomicBool
++  value: false
++  mirror: always
++
+ # Disable falling back to software decoders in case of frame drop
+ - name: media.ffmpeg.disable-software-fallback
+   type: RelaxedAtomicBool
+--- a/security/sandbox/linux/SandboxFilter.cpp
++++ b/security/sandbox/linux/SandboxFilter.cpp
+@@ -11,6 +11,9 @@
+ #include <linux/ioctl.h>
+ #include <linux/ipc.h>
+ #include <linux/memfd.h>
++#ifdef MOZ_ENABLE_V4L2
++#  include <linux/media.h>
++#endif
+ #include <linux/mman.h>
+ #include <linux/net.h>
+ #include <linux/sched.h>
+@@ -2092,6 +2095,13 @@
+ #endif
+ #ifdef MOZ_ENABLE_V4L2
+             .ElseIf(shifted_type == kVideoType, Allow())
++            // Request API controls on already broker-authorized VDE fds.
++            // Keep an explicit command list rather than allow type '|'.
++            .ElseIf(request == MEDIA_IOC_DEVICE_INFO, Allow())
++            .ElseIf(request == MEDIA_IOC_G_TOPOLOGY, Allow())
++            .ElseIf(request == MEDIA_IOC_REQUEST_ALLOC, Allow())
++            .ElseIf(request == MEDIA_REQUEST_IOC_QUEUE, Allow())
++            .ElseIf(request == MEDIA_REQUEST_IOC_REINIT, Allow())
+ #endif
+         // NVIDIA decoder from Linux4Tegra, this is specific to Tegra ARM64 SoC
+ #if defined(__aarch64__)
+--- a/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
++++ b/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
+@@ -48,6 +48,7 @@
+ 
+ #ifdef MOZ_ENABLE_V4L2
+ #  include <linux/videodev2.h>
++#  include <linux/media.h>
+ #  include <sys/ioctl.h>
+ #  include <fcntl.h>
+ #endif  // MOZ_ENABLE_V4L2
+@@ -860,7 +861,63 @@
+ }
+ 
+ #ifdef MOZ_ENABLE_V4L2
++static void AddV4l2RequestDependencies(SandboxBroker::Policy* policy) {
++  if (!Preferences::GetBool("media.ffmpeg.v4l2-request.enabled", false)) {
++    return;
++  }
++  DIR* dir = opendir("/dev");
++  if (!dir) {
++    return;
++  }
++  while (auto entry = readdir(dir)) {
++    if (strncmp(entry->d_name, "media", 5)) {
++      continue;
++    }
++    nsPrintfCString path("/dev/%s", entry->d_name);
++    int fd = open(path.get(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
++    if (fd < 0) {
++      continue;
++    }
++    struct media_device_info info = {};
++    const bool isVDE = !ioctl(fd, MEDIA_IOC_DEVICE_INFO, &info) &&
++        !strncmp(info.model, "tegra-vde", sizeof(info.model)) &&
++        !strncmp(info.bus_info, "platform:tegra-vde", sizeof(info.bus_info));
++    struct stat sb;
++    if (isVDE && !fstat(fd, &sb) && S_ISCHR(sb.st_mode)) {
++      policy->AddPath(rdwr, path.get());
++      // libudev resolves media/video nodes through sysfs. Allow only this
++      // verified VDE device tree; do not grant arbitrary camera media nodes.
++      nsPrintfCString sysPath("/sys/dev/char/%u:%u", major(sb.st_rdev),
++                              minor(sb.st_rdev));
++      UniqueFreePtr<char[]> realSysPath(realpath(sysPath.get(), nullptr));
++      if (realSysPath) {
++        nsCString devicePath(realSysPath.get());
++        const int32_t mediaDir = devicePath.RFind("/media");
++        if (mediaDir > 0) {
++          devicePath.Truncate(mediaDir);
++          if (StringEndsWith(devicePath, "/media"_ns)) {
++            devicePath.Truncate(devicePath.Length() - 6);
++          }
++          policy->AddTree(rdonly, devicePath.get());
++          policy->AddAncestors(devicePath.get(), access);
++        }
++      }
++    }
++    close(fd);
++  }
++  closedir(dir);
++  // Enumeration directories and udev metadata, never device read/write.
++  policy->AddPath(rdonly, "/sys/subsystem");
++  policy->AddPath(rdonly, "/sys/bus");
++  policy->AddTree(rdonly, "/sys/bus/media");
++  policy->AddPath(rdonly, "/sys/class");
++  policy->AddPath(rdonly, "/sys/class/media");
++  policy->AddPath(rdonly, "/sys/class/video4linux");
++  policy->AddPath(rdonly, "/sys/dev/char");
++}
++
+ static void AddV4l2Dependencies(SandboxBroker::Policy* policy) {
++  AddV4l2RequestDependencies(policy);
+   // For V4L2 hardware-accelerated video decode, RDD needs access to certain
+   // /dev/video* devices but don't want to allow it access to webcams etc.
+   // So we only allow it access to M2M video devices (encoders and decoders).

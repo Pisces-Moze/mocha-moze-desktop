@@ -1,0 +1,94 @@
+--- a/config/noctalia/tools/wallpaper_picker/backend.py
++++ b/config/noctalia/tools/wallpaper_picker/backend.py
+@@ -16,9 +16,9 @@
+ def _clear_mpvpaper():
+     """Cleanly terminate running mpvpaper instances and wait for process exit."""
+     try:
+-        subprocess.run(["pkill", "-x", "mpvpaper"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
++        subprocess.run(["pkill", "-x", "mpvpaper(-holder)?"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+         for _ in range(10):
+-            res = subprocess.run(["pgrep", "-x", "mpvpaper"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
++            res = subprocess.run(["pgrep", "-x", "mpvpaper(-holder)?"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+             if res.returncode != 0:
+                 break
+             time.sleep(0.05)
+@@ -31,10 +31,20 @@
+     try:
+         os.makedirs(STATE_DIR, exist_ok=True)
+         tmp_file = f"{ASSIGNMENTS_FILE}.tmp.{os.getpid()}"
+-        data = {
+-            "assignments": assignments,
+-            "launchedAsSystemd": {k: False for k in assignments}
+-        }
++        try:
++            with open(ASSIGNMENTS_FILE, encoding="utf-8") as source:
++                data = json.load(source)
++            if not isinstance(data, dict):
++                data = {}
++        except (OSError, ValueError):
++            data = {}
++        # Preserve plugin metadata, including the last video selection.
++        if assignments:
++            data["lastAssignments"] = dict(assignments)
++        elif data.get("assignments"):
++            data["lastAssignments"] = dict(data["assignments"])
++        data["assignments"] = assignments
++        data["launchedAsSystemd"] = {k: False for k in assignments}
+         with open(tmp_file, "w", encoding="utf-8") as f:
+             json.dump(data, f)
+         os.replace(tmp_file, ASSIGNMENTS_FILE)
+@@ -69,30 +79,31 @@
+ 
+ 
+ def apply_dynamic_wallpaper(video_path: str, thumb_path: str = None) -> bool:
+-    """Apply dynamic video wallpaper via mpvpaper and synchronize Noctalia Material You palette."""
++    """Select through the plugin so decoder and fullscreen settings stay active."""
++    if not os.path.isfile(video_path):
++        return False
+     try:
+-        # 1. Terminate existing mpvpaper instances and wait for exit
+-        _clear_mpvpaper()
+-
+-        # 2. Update assignments so Noctalia's plugin and hooks recognize the active video
+-        _write_mpvpaper_assignments({"*": video_path})
+-        time.sleep(0.15)
+-
+-        # 3. If thumbnail is available, set it as Noctalia wallpaper for instant theme sync
+-        if thumb_path and os.path.isfile(thumb_path):
+-            subprocess.run(["noctalia", "msg", "wallpaper-set", thumb_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+-
+-        # 4. Launch mpvpaper with isolated config, auto-pause, and Noctalia lua sync hook
+-        hook_script = os.path.expanduser("~/.config/noctalia/mpv-hook.lua")
+-        mpv_opts = "config=no load-scripts=no loop-file=inf panscan=1.0 no-audio hwdec=auto"
+-        if os.path.isfile(hook_script):
+-            mpv_opts += f" --script={hook_script}"
+-
+-        cmd = ["mpvpaper", "--auto-pause", "-o", mpv_opts, "*", video_path]
+-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+-        return True
+-    except Exception as e:
+-        print(f"Error applying live wallpaper: {e}", file=sys.stderr)
++        result = subprocess.run(
++            ["noctalia", "msg", "plugin", "noctalia/mpvpaper:service", "all", "set-video", video_path],
++            capture_output=True, text=True, timeout=5, check=False,
++        )
++        if result.returncode or not result.stdout.startswith("ok:"):
++            return False
++        # IPC acknowledgement means queued, not applied. Also check persisted
++        # selection; an older plugin can acknowledge an unknown event.
++        deadline = time.monotonic() + 3
++        while time.monotonic() < deadline:
++            try:
++                with open(ASSIGNMENTS_FILE, encoding="utf-8") as stream:
++                    selected = json.load(stream).get("assignments", {}).get("*")
++                if selected == video_path:
++                    return True
++            except (OSError, ValueError, AttributeError):
++                pass
++            time.sleep(0.05)
++        return False
++    except (OSError, subprocess.TimeoutExpired) as error:
++        print(f"Error applying live wallpaper: {error}", file=sys.stderr)
+         return False
+ 
+ 

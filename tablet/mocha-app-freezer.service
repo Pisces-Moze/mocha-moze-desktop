@@ -1,0 +1,19 @@
+[Unit]
+Description=Mocha background app freezing through systemd cgroup v2
+After=niri.service pipewire-pulse.service
+PartOf=graphical-session.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/libexec/mocha-session-exec /usr/local/libexec/mocha-app-freezer.py
+ExecStopPost=/usr/local/libexec/mocha-app-freezer.py --restore
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=8
+NoNewPrivileges=yes
+ProtectSystem=full
+UMask=0077
+Environment=NO_AT_BRIDGE=1
+
+[Install]
+WantedBy=graphical-session.target

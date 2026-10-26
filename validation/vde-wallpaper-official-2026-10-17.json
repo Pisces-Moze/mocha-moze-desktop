@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-17",
+  "scope": "official-noctalia-plugin-v4-fractional-gop30",
+  "release": "6.12.111-moze.1-native-vde2",
+  "driver": "tegra-vde",
+  "hardware_backend": "v4l2request",
+  "media": {
+    "codec": "H264",
+    "entropy": "CAVLC",
+    "width": 1536,
+    "height": 1086,
+    "fps": 30,
+    "gop": 30
+  },
+  "render_buffer": {
+    "width": 2048,
+    "height": 1536
+  },
+  "fullscreen_cycles": [
+    {
+      "cycle": 0,
+      "before_rss_kib": 53504,
+      "released_rss_kib": 1316,
+      "released_video_fds": 0,
+      "released_dma_buf_fds": 0,
+      "vde_suspended": true,
+      "resumed_hwdec": "v4l2request"
+    },
+    {
+      "cycle": 1,
+      "before_rss_kib": 53296,
+      "released_rss_kib": 1316,
+      "released_video_fds": 0,
+      "released_dma_buf_fds": 0,
+      "vde_suspended": true,
+      "resumed_hwdec": "v4l2request"
+    },
+    {
+      "cycle": 2,
+      "before_rss_kib": 53384,
+      "released_rss_kib": 1316,
+      "released_video_fds": 0,
+      "released_dma_buf_fds": 0,
+      "vde_suspended": true,
+      "resumed_hwdec": "v4l2request"
+    }
+  ],
+  "panels_and_overview_pause_wallpaper": false,
+  "decoder_frame_drops": 0,
+  "vo_frame_drops_occurred": true,
+  "popup_stutter_user_reported": true,
+  "persistent_vde_kernel": false,
+  "limitations": [
+    "Private DPB uses CPU layout conversion",
+    "CABAC and browser hardware decoding remain unsupported/unqualified",
+    "Compositor texture pool trial did not improve popup timing and was rolled back"
+  ],
+  "later_follow_up": "2026-10-18: player was not running and selection was empty during a later CPU check; restart/lock lifecycle and full desktop performance remain unqualified"
+}

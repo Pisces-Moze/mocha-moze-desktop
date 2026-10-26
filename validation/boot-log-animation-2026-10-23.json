@@ -1,0 +1,110 @@
+{
+  "date": "2026-10-23",
+  "status": "superseded-by-2026-10-25-two-line-layout",
+  "request": "Portrait original avatar; native logs; loading ring; one-line powered by debian plus icon at screen bottom; small Moze at the very bottom; persistent install",
+  "artwork": {
+    "tool": "built-in imagegen background-removal edit",
+    "file": "boot-animation/moze-avatar-cutout.png",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "fully_transparent_pixels": 449246,
+    "original_framing_retained": true,
+    "pixel_exact_foreground_comparison": "not asserted"
+  },
+  "verified": [
+    "Prior portrait U-Boot ARM complete build and earlycon/fbcon object compile passed",
+    "Fresh full LNX/default kernel/initramfs/DTB backups verified on tablet and PC",
+    "Browser preview verified bottom single-line branding and separate Moze footer",
+    "Candidate kernel retains cpuidle.off=1 and current 6.12.111-moze.1-native-vde2 release; latest full package still building"
+  ],
+  "default_logs": {
+    "uboot": "Standard vidconsole glyphs and ANSI foreground colours",
+    "earlycon": "Original mocha_fb_write font, layout and control characters; background-only hooks",
+    "fbcon": "Native sys_imageblit/fillrect/copyarea; temporary text and coverage buffers; no userspace kmsg renderer"
+  },
+  "production": {
+    "default_boot_changed": false,
+    "custom_kmsg_service_installed": false,
+    "custom_kmsg_service_active": false,
+    "original_niri_entry_restored": true,
+    "backup": "/srv/mocha-data/codex-debian-desktop/backups/moze-boot-animation-20261023",
+    "persistent_install_authorized": true,
+    "fresh_preinstall_backup": "boot-animation/DEPLOYMENT.md",
+    "lnx_backup_sha256": "0d4d4aff2d4aa94fa3891e1358113f39f74c688dbcdb65dc2a1a57a56e6fa9a0"
+  },
+  "pending": [
+    "Latest bottom-inline full kernel and paired U-Boot package completion",
+    "RAM display and desktop handoff acceptance",
+    "Persistent write and readback verification",
+    "Ordinary cold boot acceptance"
+  ],
+  "source_sha256": {
+    "boot-animation/moze-avatar-cutout.png": "c9f460dc8dab0908838b81bd6373e8a0c826471591af37acb00e90df2a7bfd37",
+    "boot-animation/build-assets.py": "90487d0f70a96ef15199ed16f153dbb1e54d3a006b92127eb80fbedb6af91f43",
+    "boot-animation/moze-boot-art.h": "24045360564cd5d3cd4028c716815abb24be40dd437ebe903b7f5b9dc8376c8a",
+    "boot-animation/moze-boot-assets.h": "9d7118347584f51c26de5776392c7ca7ccb1417df6405dcc0d519ce338ea31f9",
+    "boot-animation/preview.html": "98362bcbb993c10b41383c6e5688b0aed47811e1f5939ffc6b589c99f6cda7b9",
+    "boot-animation/preview-boot.log": "2306638a2df2aeeb6940ff558d2bfdd1786111a32d887b55432c0e55afcaa4a6",
+    "tablet/niri-entry": "9d3f4f3d3b9c3ea36b786b72bd4e1825572baf8a09166f529108f8be50a2590c",
+    "boot-animation/spinner-frames.json": "8ccc14e44168391ef86f52690cf10915b31b3ea627fe0caa354743858dc0e7c5",
+    "boot-animation/BRANDING-LICENSE.md": "8eda06c78d65c5f548a0a5088ad486e03160cc42012b6bc23c9d6fa05a7a5633",
+    "boot-animation/branding-sources.json": "1096745e74ac5e8fcd292bce4286b952c7e7cc51735f03ccd864741f52c9dce8",
+    "boot-animation/debian-swirl-small.png": "7c6320f604494c7976ed396c64a0096c60b9b049dee6eeda2fa213426685d1ad",
+    "boot-animation/debian-swirl.svg": "89a3ca1a1bc91610edcc637457e7275a159309f4621829b2a0170e28970cac20",
+    "boot-animation/DEPLOYMENT.md": "48342795844aebf40bce65975863349a62968bfd5f0051ed4f56f9dd0d472c2e",
+    "boot-animation/moze-footer.png": "9ffbc0b634253e4815f908ecda03bbb3a0f6c71e82d58d499e5b235efb302712",
+    "boot-animation/powered-by-debian.png": "b2557ce435e56d1e25f571d3735f3167c57e5d668077d36d288cd97d1bc42c3b",
+    "boot-animation/PROMPT.md": "e8e3d176633a6f11055852aa35f892e045eb54d0bf2952dd788781f17bacd248",
+    "boot-animation/README.md": "fc773e3f97ba9526a6ef79865b4f94259823fefd83d789a2675a0c3464231e4f",
+    "boot-animation/fonts/GoogleSans.ttf": "d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a",
+    "boot-animation/fonts/OFL.txt": "2b75ef20f13d83a7514aee452c4782c20cdc9ff2dee17600f44d37a06d4fb958"
+  },
+  "layout": {
+    "width": 1536,
+    "height": 2048,
+    "rotation": "physical portrait, no artwork rotation",
+    "avatar": {
+      "x": 558,
+      "y": 430,
+      "width": 420,
+      "height": 420
+    },
+    "ring": {
+      "x": 736,
+      "y": 1388,
+      "width": 64,
+      "height": 64,
+      "frames": 64,
+      "frame_ms": 30,
+      "alpha_bits": 4,
+      "asset_bytes_total": 373296
+    },
+    "extra_text": "only user-requested bottom branding plus native console logs",
+    "native_logs": true,
+    "desktop_charger_orientation_changed": false,
+    "brand": {
+      "x": 468,
+      "y": 1800,
+      "width": 600,
+      "height": 84,
+      "text": "powered by debian",
+      "single_line": true,
+      "font": "Official Google Sans, OFL 1.1",
+      "icon": "Official Debian open-use swirl"
+    },
+    "footer": {
+      "x": 648,
+      "y": 1940,
+      "width": 240,
+      "height": 60,
+      "text": "Moze"
+    }
+  },
+  "builder_input_sha256": "943d3d6c31a5191814cc5b3ee58b79f3ebfcdebefd1805c45945c5fb27f318a8",
+  "superseded_by": "boot-log-animation-2026-10-25.json"
+}

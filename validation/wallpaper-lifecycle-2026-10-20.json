@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-20",
+  "scope": "Persistent plugin/picker fixes, bounded hardware release checks and one short player comparison",
+  "deployed": {
+    "static_handover": true,
+    "resource_pressure_policy": true,
+    "pressure_reconfiguration_edges": true,
+    "mpv_render_update_flags": true,
+    "service_sha256": "b9bf99991e3a8813d33341ea75efee99fcb6d1db38dbf2973938cbee97428c68",
+    "manifest_sha256": "9af94a6579c12fc9760eb959e00fddb0080e03ee46818f1e3bf7ac08f08a1d70",
+    "picker_sha256": "2d4866bbba0b64b4a4de51640ad8b50d50f29a6c799cdbdd2c6e7ed6f7e453fa",
+    "player_sha256": "7f6f0bfc506ea7564bd7be0156a8f9b208ab10615f43e2b790d4cadbecd0776d",
+    "backups_preserved": true,
+    "final_sources_match_complete_patch_stack": true,
+    "service_hot_reload_logged": true,
+    "temporary_thresholds_restored": true,
+    "original_static_selection_restored": true
+  },
+  "single_static_selection": {
+    "before": {"players": 1, "holders": 0, "player_rss_kib": 51912, "vde": "active", "module_refcount": 2},
+    "after": {"players": 0, "holders": 0, "player_rss_kib": 0, "vde": "suspended", "module_refcount": 0},
+    "assignments_and_last_assignments_empty": true,
+    "physical_lock_unlock_cycle_repeated": false
+  },
+  "pressure_release": {
+    "method": "Temporarily raise low/recovery thresholds to trigger the actual sensor policy; no memory allocation or real OOM",
+    "stable_absence_required_seconds": 3,
+    "before": {"players": 1, "player_rss_kib": 52200, "vde": "active", "module_refcount": 2},
+    "released": {"players": 0, "holders": 0, "player_rss_kib": 0, "vde": "suspended", "module_refcount": 0},
+    "recovered": {"players": 1, "player_rss_kib": 51852, "vde": "active", "module_refcount": 2, "decoder": "v4l2request"},
+    "defaults": {"low_mib": 128, "recovery_mib": 256, "hold_seconds": 3, "recovery_seconds": 15, "critical_immediate_mib": 64},
+    "cpu_psi_some_threshold": 85,
+    "popup_or_overview_is_a_pause_trigger": false,
+    "final_edge_revision_validation": "Actual-source regression, source/hash check and successful service hot reload; no repeated hardware pressure cycle"
+  },
+  "regressions": {
+    "actual_service_lua_harnesses_passed": ["delayed launch and frame-extraction races", "static selection wins over stale callbacks", "unlock reapply cannot revive explicitly cleared video", "release and recovery hysteresis", "saved playback position across settings changes", "disabled CPU policy permits recovery", "managed clear/reapply/restart"],
+    "picker_tests_passed": 7,
+    "installer_prefixes_passed": 6,
+    "installer_check_preserves_sources": true,
+    "installer_conflict_refusal_and_backups_passed": true
+  },
+  "player_comparison": {
+    "sample_seconds_each": 8,
+    "cpu_unit": "Percent of one CPU core; kworker is the sampled aggregate",
+    "frequency_fixed_for_comparison": false,
+    "before": {"niri": 42.73, "mpvpaper": 28.07, "noctalia": 6.21, "kworker": 36.27, "decoder": "v4l2request", "display_drops": 0},
+    "after": {"niri": 44.23, "mpvpaper": 29.19, "noctalia": 5.22, "kworker": 38.01, "decoder": "v4l2request", "display_drops": 0},
+    "conclusion": "Render-update API handling corrected; this short sample demonstrates no CPU improvement and is not a smoothness acceptance test"
+  },
+  "remaining": [
+    "Genuine per-output occlusion, including multiple opaque windows, with transparency and X-Ray dependencies respected",
+    "Dynamic wallpaper interaction stutter and compositor/decoder layout-conversion costs",
+    "Video decoding features beyond progressive H.264 CAVLC and browser decode integration",
+    "Internal RT5671 speaker path",
+    "Complete CUDA Runtime beyond limited Gdev Driver API kernels"
+  ],
+  "private_media_or_credentials_published": false
+}

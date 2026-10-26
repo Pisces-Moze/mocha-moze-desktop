@@ -14,7 +14,8 @@ patches=(0004-mesa-tegra-optional-fence-callbacks.patch
          0007-mesa-gk20a-write-combined-gpu-buffers.patch
          0015-mesa-tegra-scanout-lifetime.patch
          0016-mesa-tegra-sampler-ownership.patch
-         0017-mesa-tegra-transferred-view-release.patch)
+         0017-mesa-tegra-transferred-view-release.patch
+         0023-mesa-gk20a-command-upload.patch)
 # Compile the experimental support only when explicitly requested. Runtime
 # activation additionally requires MOCHA_NATIVE_FENCE=1 on GK20A.
 if [ "${MOCHA_NATIVE_FENCE_BUILD:-0}" = 1 ]; then
@@ -36,6 +37,7 @@ python3 "$repo/tools/test-mesa-tegra-ui.py" "$src"
 python3 "$repo/tools/test-mesa-tegra-modifiers.py" "$src"
 python3 "$repo/tools/test-mesa-scanout-lifetime.py" "$src"
 python3 "$repo/tools/test-mesa-sampler-ownership.py" "$src"
+python3 "$repo/tools/test-mesa-command-upload.py" "$src"
 mkdir -p "$out"
 meson setup "$out/build" "$src" \
  --cross-file "$repo/mesa-armhf-cross.ini" --buildtype=release \

@@ -1,0 +1,131 @@
+--- a/src/dbus/bluetooth/bluetooth_agent.cpp
++++ b/src/dbus/bluetooth/bluetooth_agent.cpp
+@@ -6,6 +6,7 @@
+ #include <optional>
+ #include <sdbus-c++/IConnection.h>
+ #include <sdbus-c++/IObject.h>
++#include <sdbus-c++/IProxy.h>
+ #include <sdbus-c++/MethodResult.h>
+ #include <sdbus-c++/Types.h>
+ #include <sdbus-c++/VTableItems.h>
+@@ -30,6 +31,7 @@
+ struct BluetoothAgent::Impl {
+   SystemBus& bus;
+   std::unique_ptr<sdbus::IObject> object;
++  std::unique_ptr<sdbus::IProxy> daemon;
+   BluetoothAgent::RequestCallback requestCallback;
+ 
+   BluetoothPairingRequest pending;
+@@ -75,7 +77,31 @@
+     clearPending();
+   }
+ 
++  void finishDisplayFor(const sdbus::ObjectPath& device) {
++    // An informational keyboard code must not block the subsequent HID
++    // service authorization for that same device. Actual prompts stay pending.
++    if (pending.devicePath == std::string(device)
++        && (pending.kind == BluetoothPairingKind::DisplayPinCode
++            || pending.kind == BluetoothPairingKind::DisplayPasskey)) {
++      clearPending();
++    }
++  }
++
++  void registerAgent() {
++    try {
++      auto manager = sdbus::createProxy(bus.connection(), kBluezBusName, kBluezRoot);
++      manager->callMethod("RegisterAgent").onInterface(kAgentManagerInterface)
++          .withArguments(kAgentObjectPath, std::string(kCapability));
++      manager->callMethod("RequestDefaultAgent").onInterface(kAgentManagerInterface)
++          .withArguments(kAgentObjectPath);
++      kLog.info("registered BlueZ agent at {}", std::string(kAgentObjectPath));
++    } catch (const sdbus::Error& e) {
++      kLog.warn("BlueZ agent registration failed: {}", e.what());
++    }
++  }
++
+   void onRequestPinCode(sdbus::Result<std::string>&& result, sdbus::ObjectPath device) {
++    finishDisplayFor(device);
+     if (hasPending()) {
+       rejectIfBusy(result, "RequestPinCode");
+       return;
+@@ -94,11 +120,13 @@
+     pending.kind = BluetoothPairingKind::DisplayPinCode;
+     pending.devicePath = device;
+     pending.pin = std::move(pincode);
+-    pendingVoid = std::move(result);
++    // DisplayPinCode is informational: acknowledge before the user types.
++    result.returnResults();
+     fireCallback();
+   }
+ 
+   void onRequestPasskey(sdbus::Result<std::uint32_t>&& result, sdbus::ObjectPath device) {
++    finishDisplayFor(device);
+     if (hasPending()) {
+       rejectIfBusy(result, "RequestPasskey");
+       return;
+@@ -133,6 +161,7 @@
+   }
+ 
+   void onRequestConfirmation(sdbus::Result<>&& result, sdbus::ObjectPath device, std::uint32_t passkey) {
++    finishDisplayFor(device);
+     if (hasPending()) {
+       rejectIfBusy(result, "RequestConfirmation");
+       return;
+@@ -145,6 +174,7 @@
+   }
+ 
+   void onRequestAuthorization(sdbus::Result<>&& result, sdbus::ObjectPath device) {
++    finishDisplayFor(device);
+     if (hasPending()) {
+       rejectIfBusy(result, "RequestAuthorization");
+       return;
+@@ -156,6 +186,7 @@
+   }
+ 
+   void onAuthorizeService(sdbus::Result<>&& result, sdbus::ObjectPath device, std::string uuid) {
++    finishDisplayFor(device);
+     if (hasPending()) {
+       rejectIfBusy(result, "AuthorizeService");
+       return;
+@@ -223,15 +254,20 @@
+       )
+       .forInterface(kAgentInterface);
+ 
+-  try {
+-    auto agentManager = sdbus::createProxy(bus.connection(), kBluezBusName, kBluezRoot);
+-    agentManager->callMethod("RegisterAgent")
+-        .onInterface(kAgentManagerInterface)
+-        .withArguments(kAgentObjectPath, std::string(kCapability));
+-    agentManager->callMethod("RequestDefaultAgent").onInterface(kAgentManagerInterface).withArguments(kAgentObjectPath);
+-    kLog.info("registered BlueZ agent at {}", std::string(kAgentObjectPath));
+-  } catch (const sdbus::Error& e) {
+-    kLog.warn("BlueZ agent registration failed: {}", e.what());
++  m_impl->daemon = sdbus::createProxy(bus.connection(), sdbus::ServiceName{"org.freedesktop.DBus"},
++                                    sdbus::ObjectPath{"/org/freedesktop/DBus"});
++  m_impl->daemon->uponSignal("NameOwnerChanged").onInterface("org.freedesktop.DBus")
++      .call([this](const std::string& name, const std::string&, const std::string& newOwner) {
++        if (name != "org.bluez") {
++          return;
++        }
++        m_impl->cancelPending();
++        if (!newOwner.empty()) {
++          m_impl->registerAgent();
++        }
++      });
++  if (bus.nameHasOwner("org.bluez")) {
++    m_impl->registerAgent();
+   }
+ }
+ 
+@@ -255,7 +291,10 @@
+ }
+ 
+ void BluetoothAgent::acceptConfirm() {
+-  if (m_impl == nullptr || !m_impl->pendingVoid) {
++  if (m_impl == nullptr) {
++    return;
++  }
++  if (!m_impl->pendingVoid) {
+     m_impl->clearPending();
+     return;
+   }

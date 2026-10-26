@@ -1,0 +1,210 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -29,6 +29,8 @@
+ local pressureActive = false
+ local pressureReason = nil
+ local pressureReleased = {}
++local covered = {}
++local coverBadSince = {}
+ local resumePositions = {}
+ local pressureBadSince = nil
+ local pressureGoodSince = nil
+@@ -166,6 +168,7 @@
+   noctalia.state.set("paused", paused)
+   noctalia.state.set("resourcePaused", pressureActive)
+   noctalia.state.set("resourceReason", pressureReason)
++  noctalia.state.set("covered", covered)
+ end
+ 
+ -- ==============================================================================
+@@ -457,7 +460,7 @@
+ -- playlist; when it is disabled, we just point it at the single file.
+ local function startMpvpaper(connector, path)
+   local generation = nextGeneration(connector)
+-  if pressureActive then
++  if pressureActive or covered[connector] then
+     local paused = isPaused[connector] == true
+     local released = pressureReleased[connector]
+     if not released or released.path ~= path then
+@@ -581,6 +584,8 @@
+   local path = assignments[connector]
+   assignments[connector] = nil
+   pressureReleased[connector] = nil
++  covered[connector] = nil
++  coverBadSince[connector] = nil
+   resumePositions[connector] = nil
+   persist()
+ 
+@@ -605,6 +610,8 @@
+   staticRequest = staticRequest + 1
+   staticSelection = nil
+   pressureReleased[connector] = nil
++  covered[connector] = nil
++  coverBadSince[connector] = nil
+   resumePositions[connector] = nil
+ 
+   -- Resolve overlaps: clear specific assignments when applying globally, and vice versa.
+@@ -634,6 +641,8 @@
+   -- Reapply after an unlock must not resurrect an older video selection.
+   lastAssignments = {}
+   pressureReleased = {}
++  covered = {}
++  coverBadSince = {}
+   resumePositions = {}
+   local connectors = {}
+   for conn in pairs(assignments) do connectors[conn] = true end
+@@ -689,7 +698,7 @@
+   local released = { path = path, wasPaused = isPaused[connector] == true }
+   pressureReleased[connector] = released
+   local function finish(result)
+-    if not pressureActive or not currentSelection(connector, path, generation) then return end
++    if not (pressureActive or covered[connector]) or not currentSelection(connector, path, generation) then return end
+     if result and type(result.stdout) == "string" then
+       local value = tonumber(result.stdout:match('"data"%s*:%s*([%d%.]+)'))
+       if value and value >= 0 and value < 2678400 then released.position = value end
+@@ -714,9 +723,55 @@
+   end
+ end
+ 
++-- The compositor publishes transitions after its X-Ray-aware visibility pass.
++-- Unknown/stale sessions fail open. No geometric guesses, shell commands or
++-- additional polling processes are needed for this policy.
++local function updateCoverage(now)
++  local socket = noctalia.getenv("NIRI_SOCKET") or ""
++  local pid = socket:match("%.(%d+)%.sock$")
++  local runtime = noctalia.getenv("XDG_RUNTIME_DIR")
++  local enabled = cfg("release_when_covered") == true and pid and runtime and
++    (noctalia.readFile("/proc/" .. pid .. "/comm") or ""):match("^niri%s*$")
++  local function hidden(name)
++    if not enabled then return false end
++    local encoded = name:gsub(".", function(c) return string.format("%02x", c:byte()) end)
++    local text = noctalia.readFile(runtime .. "/mocha-niri-background-" .. pid .. "-" .. encoded .. ".json")
++    if type(text) ~= "string" then return false end
++    local ok, data = pcall(noctalia.json.decode, text)
++    return ok and type(data) == "table" and data.schema == 1 and data.pid == tonumber(pid) and
++      data.output == name and data.visible == false and data.overview ~= true and data.shell_overlay ~= true
++  end
++  local changed = false
++  for connector in pairs(assignments) do
++    local allHidden = enabled and true or false
++    if connector == "*" then
++      local outputs = noctalia.outputs()
++      allHidden = allHidden and #outputs > 0
++      for _, output in ipairs(outputs) do
++        if not hidden(output.name) then allHidden = false; break end
++      end
++    else
++      allHidden = allHidden and hidden(connector)
++    end
++    if allHidden then
++      coverBadSince[connector] = coverBadSince[connector] or now
++      if now - coverBadSince[connector] >= pressureNumber("covered_hold_seconds", 2, 1, 30) then
++        if not covered[connector] then changed = true end
++        covered[connector] = true
++      end
++    else
++      coverBadSince[connector] = nil
++      if covered[connector] then changed = true end
++      covered[connector] = nil
++    end
++  end
++  if changed then publish() end
++end
++
+ local function updateResourcePressure()
+   local wasActive = pressureActive
+   local now = noctalia.nowMs() / 1000
++  if next(assignments) ~= nil then updateCoverage(now) end
+   local enabled = cfg("pause_on_pressure") == true
+   local info = noctalia.readFile("/proc/meminfo")
+   local available = type(info) == "string" and tonumber(info:match("MemAvailable:%s+(%d+)")) or nil
+@@ -754,20 +809,18 @@
+     if pressureActive and pressureGoodSince and now - pressureGoodSince >= delay then
+       pressureActive = false
+       pressureReason = nil
+-      for connector, released in pairs(pressureReleased) do
+-        pressureReleased[connector] = nil
+-        if assignments[connector] == released.path then
+-          resumePositions[connector] = released
+-          startMpvpaper(connector, released.path)
+-        end
+-      end
+       publish()
+     end
+   end
+-  if pressureActive then
+-    for connector, path in pairs(assignments) do
+-      if not pressureReleased[connector] or pressureReleased[connector].path ~= path then
+-        releaseUnderPressure(connector, path)
++  for connector, path in pairs(assignments) do
++    local released = pressureReleased[connector]
++    if pressureActive or covered[connector] then
++      if not released or released.path ~= path then releaseUnderPressure(connector, path) end
++    elseif released then
++      pressureReleased[connector] = nil
++      if path == released.path then
++        resumePositions[connector] = released
++        startMpvpaper(connector, path)
+       end
+     end
+   end
+--- a/plugin.toml
++++ b/plugin.toml
+@@ -192,6 +192,23 @@
+ max = 300
+ step = 1
+ 
++[[setting]]
++key = "release_when_covered"
++type = "bool"
++label_key = "settings.release_when_covered.label"
++description_key = "settings.release_when_covered.description"
++default = true
++
++[[setting]]
++key = "covered_hold_seconds"
++type = "int"
++label_key = "settings.covered_hold_seconds.label"
++description_key = "settings.covered_hold_seconds.description"
++default = 2
++min = 1
++max = 30
++step = 1
++
+ # Headless background service: owns the mpvpaper logic and per-output assignments.
+ [[service]]
+ id = "service"
+--- a/translations/en.json
++++ b/translations/en.json
+@@ -92,6 +92,14 @@
+     "pressure_recovery_seconds": {
+       "label": "Recovery stability delay (seconds)",
+       "description": "Wait for stable recovery to avoid repeated stop/start cycles."
++    },
++    "release_when_covered": {
++      "label": "Release fully hidden wallpaper",
++      "description": "Use compositor visibility, preserving transparent and blurred backgrounds; keep playing during overview and shell panels."
++    },
++    "covered_hold_seconds": {
++      "label": "Full occlusion hold (seconds)",
++      "description": "Ignore brief occlusion while windows move or animate."
+     }
+   },
+   "slideshow": "Slideshow",
+--- a/translations/zh-Hans.json
++++ b/translations/zh-Hans.json
+@@ -92,6 +92,14 @@
+     "pressure_recovery_seconds": {
+       "label": "恢复稳定等待 (秒)",
+       "description": "资源稳定充足后再恢复，避免反复启停。"
++    },
++    "release_when_covered": {
++      "label": "壁纸完全不可见时释放资源",
++      "description": "依据合成器实际可见性；保留透明和毛玻璃背景，概览和顶部面板期间继续播放。"
++    },
++    "covered_hold_seconds": {
++      "label": "完全遮挡等待（秒）",
++      "description": "忽略窗口切换和动画中的短暂遮挡。"
+     }
+   },
+   "slideshow": "幻灯片放映",

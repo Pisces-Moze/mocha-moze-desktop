@@ -1,0 +1,165 @@
+{
+  "date": "2026-10-20",
+  "status": "installed_and_live_checked",
+  "kernel_changed": false,
+  "niri_sha256": "b4f625aa1fc5e0ddd7c4d18c0e6291abd9fb353b58b6fa60a6f1b688043ee9fb",
+  "plugin_service_sha256": "fa713264fdc1494c12141e3aecb608dedb95b5f2785c18def32e66ff616687e8",
+  "patches": {
+    "0016-niri-wallpaper-visibility.patch": "544783bff1a30aca5b99847631befa5e5e46e868fc5a25c033c6fe0aaaff0360",
+    "0017-noctalia-wallpaper-occlusion.patch": "a52d716115da602aa72302fccfc148fd6664309b3e99ac5aa06c94b824a8948c"
+  },
+  "policy": {
+    "producer": "Niri X-Ray-aware render-element presentation",
+    "polling": "existing plugin 1 Hz update",
+    "default_hidden_hold_seconds": 2,
+    "unknown_session": "keep playing",
+    "overview_and_shell_panels": "keep playing",
+    "wildcard": "release only when all outputs hidden",
+    "memory_pressure": "takes priority over occlusion recovery"
+  },
+  "live": {
+    "desktop": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "ref": 2,
+      "visibility": {
+        "output": "DSI-1",
+        "overview": false,
+        "schema": 1,
+        "shell_overlay": false,
+        "visible": true
+      }
+    },
+    "fullscreen_release": {
+      "players": 0,
+      "holders": 0,
+      "vde": "suspended",
+      "ref": 0,
+      "visibility": {
+        "output": "DSI-1",
+        "overview": false,
+        "schema": 1,
+        "shell_overlay": false,
+        "visible": false
+      }
+    },
+    "overview": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "ref": 2,
+      "visibility": {
+        "output": "DSI-1",
+        "overview": true,
+        "schema": 1,
+        "shell_overlay": false,
+        "visible": true
+      }
+    },
+    "panel": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "ref": 2,
+      "visibility": {
+        "output": "DSI-1",
+        "overview": false,
+        "schema": 1,
+        "shell_overlay": true,
+        "visible": true
+      }
+    },
+    "covered_window_layouts": [
+      {
+        "app_id": "mocha-occlusion-left",
+        "layout": {
+          "pos_in_scrolling_layout": null,
+          "tile_size": [
+            699.3333333333334,
+            1088.0
+          ],
+          "window_size": [
+            699,
+            1088
+          ],
+          "tile_pos_in_workspace_view": [
+            0.0,
+            -0.0
+          ],
+          "window_offset_in_tile": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      {
+        "app_id": "mocha-occlusion-right",
+        "layout": {
+          "pos_in_scrolling_layout": null,
+          "tile_size": [
+            699.3333333333334,
+            1088.0
+          ],
+          "window_size": [
+            699,
+            1088
+          ],
+          "tile_pos_in_workspace_view": [
+            682.0,
+            -0.0
+          ],
+          "window_offset_in_tile": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    ],
+    "two_window_release": {
+      "players": 0,
+      "holders": 0,
+      "vde": "suspended",
+      "ref": 0,
+      "visibility": {
+        "output": "DSI-1",
+        "overview": false,
+        "schema": 1,
+        "shell_overlay": false,
+        "visible": false
+      }
+    },
+    "uncovered": {
+      "players": 1,
+      "holders": 0,
+      "vde": "active",
+      "ref": 2,
+      "visibility": {
+        "output": "DSI-1",
+        "overview": false,
+        "schema": 1,
+        "shell_overlay": false,
+        "visible": true
+      }
+    }
+  },
+  "diagnostic_configuration": {
+    "old_focused_fullscreen_policy": "temporarily disabled to isolate the new mechanism",
+    "test_windows": "owned opaque Wayland SHM toplevels; no GPU benchmark workload",
+    "restore": "probe windows closed; original configuration bytes and static wallpaper restored; temporary idle guard stopped"
+  },
+  "regressions": [
+    "actual service Lua occlusion/overview/panels/X-Ray/multi-output/pressure/stale producer",
+    "resource pressure hysteresis and seek",
+    "static handover and delayed callbacks",
+    "managed selection lifecycle",
+    "installer seven prefix states, read-only checks, backups and conflicts"
+  ],
+  "limitations": [
+    "Live hardware has one display; multi-output policy tested in the service sandbox.",
+    "Transparent windows or X-Ray consumers retain the wallpaper when it remains visible.",
+    "Hardware playback resumes, but smooth seek and frame latency are not established by this resource test.",
+    "Dynamic wallpaper interaction CPU/stutter remains unresolved.",
+    "Broader VDE features, browser hardware decode, internal speakers and complete CUDA Runtime remain open."
+  ]
+}

@@ -1,0 +1,54 @@
+--- a/src/niri.rs
++++ b/src/niri.rs
+@@ -6157,4 +6157,13 @@
+     pub fn focus_layer_surface_if_on_demand(&mut self, surface: Option<LayerSurface>) {
+         if let Some(surface) = surface {
++            // An external OSK receives touch/pointer input while the text field
++            // in an OnDemand panel must remain the keyboard focus target.
++            if crate::shell_keyboard_focus::preserve_on_demand(
++                surface.namespace(),
++                surface.cached_state().keyboard_interactivity
++                    == wlr_layer::KeyboardInteractivity::None,
++            ) {
++                return;
++            }
+             if surface.cached_state().keyboard_interactivity
+                 == wlr_layer::KeyboardInteractivity::OnDemand
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -26,4 +26,6 @@
+ pub mod window;
+ 
++mod shell_keyboard_focus;
++
+ #[cfg(test)]
+ mod tests;
+--- /dev/null
++++ b/src/shell_keyboard_focus.rs
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++//! Non-focusable tablet input surfaces do not dismiss an OnDemand layer's focus.
++pub(crate) fn preserve_on_demand(namespace: &str, no_keyboard_focus: bool) -> bool {
++    no_keyboard_focus
++        && matches!(namespace, "mocha-touch-keyboard" | "mocha-pinyin-candidates")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::preserve_on_demand;
++    #[test]
++    fn keyboard_and_candidates_keep_the_text_field_focused() {
++        assert!(preserve_on_demand("mocha-touch-keyboard", true));
++        assert!(preserve_on_demand("mocha-pinyin-candidates", true));
++    }
++    #[test]
++    fn other_clicks_keep_existing_focus_policy() {
++        for name in ["noctalia-bar-bar", "noctalia-panel-click-shield", "", "other-app"] {
++            assert!(!preserve_on_demand(name, true));
++        }
++    }
++    #[test]
++    fn focusable_surface_cannot_claim_the_keyboard_exception() {
++        assert!(!preserve_on_demand("mocha-touch-keyboard", false));
++    }
++}

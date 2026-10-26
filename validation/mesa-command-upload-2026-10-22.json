@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-22",
+  "status": "persistently_installed_user_confirmed_partial_improvement",
+  "kernel": "6.12.111-moze.1-native-vde2",
+  "libgallium_sha256": "caf9c2a0360833cf1f76f3befda4dd71e9745d5bfcea3f71afb6ac0c0d6a1249",
+  "previous_libgallium_sha256": "cc81fe6399af38442a48aa52801400086dcb43008aae292353ebac4d65c57fbe",
+  "change": "0023-mesa-gk20a-command-upload.patch: WC command rings on GK20A GART with supported DRM ABI; initial allocation and growth share the policy",
+  "validation": {
+    "new_policy_cases": 8,
+    "previous_source_suites_passed": 5,
+    "process_maps_verified": [
+      "niri",
+      "noctalia",
+      "mpvpaper"
+    ],
+    "diagnostic_preload_removed": true,
+    "idle_inhibition_restored": true
+  },
+  "bounded_bo_audit": {
+    "seconds": 20.008,
+    "push_submissions": 5306,
+    "cached_native_512KiB_command_buffer_submissions": 5302,
+    "input_domain": 12,
+    "imported_dma_buf_sync_bypassed": false
+  },
+  "short_cpu_sample": {
+    "unit": "percent of one CPU core, separate approximately 8-second windows",
+    "niri_before": 49.16,
+    "niri_after": 37.7,
+    "niri_kernel_before": 33.31,
+    "niri_kernel_after": 18.42,
+    "mpvpaper_before": 25.63,
+    "mpvpaper_after": 25.21,
+    "noctalia_before": 5.08,
+    "noctalia_after": 5.07
+  },
+  "ten_second_niri_callchain_samples": {
+    "before_total": 489,
+    "before_nouveau_bo_sync_for_device_validate": 154,
+    "after_total": 439,
+    "after_nouveau_bo_sync_for_device_validate": 5
+  },
+  "playback": {
+    "hardware_decoder": "v4l2request",
+    "size": [
+      1536,
+      1086
+    ],
+    "fps": 30,
+    "decoder_drops_before_and_after": 0,
+    "frame_drops_before_and_after": 0,
+    "delayed_frames_before_and_after": 0
+  },
+  "user_feedback": "卡顿减轻，现在全力处理扬声器",
+  "limits": [
+    "Finite short sequential samples, not randomized long-duration benchmarks.",
+    "No P95/P99 presentation latency or complete elimination of stutter is claimed.",
+    "Wallpaper quality, blur, effect settings and CPU/GPU policy were retained.",
+    "No meaningful MPV CPU improvement is claimed."
+  ]
+}

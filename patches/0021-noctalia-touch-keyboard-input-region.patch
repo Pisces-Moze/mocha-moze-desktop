@@ -1,0 +1,240 @@
+--- /dev/null
++++ b/src/shell/panel/touch_keyboard_exclusion.h
+@@ -0,0 +1,44 @@
++#pragma once
++#include <array>
++#include <optional>
++#include <vector>
++#include <nlohmann/json.hpp>
++
++namespace touch_keyboard {
++struct State {
++  int pid = 0;
++  int x = 0, y = 0, width = 0, height = 0;
++  std::vector<std::array<int, 3>> rects; // width, height, bottom margin
++};
++
++inline std::optional<State> parse(const nlohmann::json& j) {
++  try {
++    if (!j.is_object() || !j.value("visible", false)) return std::nullopt;
++    State s;
++    s.pid = j.at("pid").get<int>();
++    const auto& m = j.at("monitor");
++    s.x = m.at("x").get<int>(); s.y = m.at("y").get<int>();
++    s.width = m.at("width").get<int>(); s.height = m.at("height").get<int>();
++    if (s.pid <= 0 || s.width <= 0 || s.height <= 0 || s.width > 32768 || s.height > 32768)
++      return std::nullopt;
++    const auto& rects = j.at("rects");
++    if (!rects.is_array() || rects.empty() || rects.size() > 4) return std::nullopt;
++    for (const auto& r : rects) {
++      const int w = r.at("width").get<int>(), h = r.at("height").get<int>(), b = r.at("bottom").get<int>();
++      if (w <= 0 || h <= 0 || w > s.width || h > s.height || b < 0 || b > s.height - h)
++        return std::nullopt;
++      s.rects.push_back({w, h, b});
++    }
++    return s;
++  } catch (const nlohmann::json::exception&) { return std::nullopt; }
++}
++
++inline std::vector<std::array<int, 4>> rectangles(
++    const State& s, int x, int y, int width, int height, int surfaceWidth, int surfaceHeight) {
++  if (s.x != x || s.y != y || s.width != width || s.height != height
++      || surfaceWidth != width || surfaceHeight != height) return {};
++  std::vector<std::array<int, 4>> result;
++  for (const auto& r : s.rects) result.push_back({(width-r[0])/2, height-r[2]-r[1], r[0], r[1]});
++  return result;
++}
++} // namespace touch_keyboard
+--- a/src/shell/panel/panel_click_shield.h
++++ b/src/shell/panel/panel_click_shield.h
+@@ -1,6 +1,9 @@
+ #pragma once
+ 
+ #include "wayland/surface.h"
++#include "core/files/file_watcher.h"
++#include "core/timer_manager.h"
++#include "shell/panel/touch_keyboard_exclusion.h"
+ 
+ #include <cstdint>
+ #include <functional>
+@@ -50,7 +53,7 @@
+   PanelClickShield(const PanelClickShield&) = delete;
+   PanelClickShield& operator=(const PanelClickShield&) = delete;
+ 
+-  void initialize(WaylandConnection& wayland);
++  void initialize(WaylandConnection& wayland, FileWatcher* files = nullptr);
+ 
+   // Map a fullscreen shield on each of the given outputs.
+   void activate(const std::vector<wl_output*>& outputs, LayerShellLayer layer, ExcludeProvider excludeProvider);
+@@ -91,6 +94,14 @@
+   void applyConfigured(Shield& shield, std::uint32_t width, std::uint32_t height);
+   void applyInputRegion(Shield& shield);
+ 
++  void reloadTouchKeyboard();
++  void refreshInputRegions();
++  FileWatcher* m_files = nullptr;
++  FileWatcher::WatchId m_keyboardWatch = 0;
++  std::filesystem::path m_keyboardPath;
++  std::optional<touch_keyboard::State> m_keyboard;
++  Timer m_keyboardReloadTimer;
++  Timer m_keyboardLivenessTimer;
+   WaylandConnection* m_wayland = nullptr;
+   wl_buffer* m_buffer = nullptr;
+   std::unordered_map<wl_output*, std::unique_ptr<Shield>> m_shields;
+--- a/src/shell/panel/panel_click_shield.cpp
++++ b/src/shell/panel/panel_click_shield.cpp
+@@ -7,6 +7,10 @@
+ #include "wayland/wayland_connection.h"
+ #include "wlr-layer-shell-unstable-v1-client-protocol.h"
+ 
++#include <array>
++#include <cstdlib>
++#include <fstream>
++#include <signal.h>
+ #include <cerrno>
+ #include <cstring>
+ #include <sys/mman.h>
+@@ -48,6 +52,7 @@
+ } // namespace
+ 
+ PanelClickShield::~PanelClickShield() {
++  if (m_files && m_keyboardWatch) m_files->unwatch(m_keyboardWatch);
+   deactivate();
+   if (m_buffer != nullptr) {
+     wl_buffer_destroy(m_buffer);
+@@ -55,7 +60,54 @@
+   }
+ }
+ 
+-void PanelClickShield::initialize(WaylandConnection& wayland) { m_wayland = &wayland; }
++void PanelClickShield::initialize(WaylandConnection& wayland, FileWatcher* files) {
++  m_wayland = &wayland;
++  m_files = files;
++  if (const char* runtime = std::getenv("XDG_RUNTIME_DIR"); runtime && runtime[0]) {
++    m_keyboardPath = std::filesystem::path(runtime) / "mocha-keyboard-visible.json";
++    if (m_files) m_keyboardWatch = m_files->watch(m_keyboardPath, [this] {
++      reloadTouchKeyboard();
++      // FileWatcher coalesces rapid writes. Read the final show/hide/resize
++      // state once after that interval, without a continuous file poll.
++      m_keyboardReloadTimer.start(std::chrono::milliseconds(110), [this] { reloadTouchKeyboard(); });
++    }, FileWatcher::WatchTrigger::WriteCompleted);
++  }
++}
++
++void PanelClickShield::refreshInputRegions() {
++  for (auto& [output, shield] : m_shields) {
++    if (shield && shield->configured) {
++      applyInputRegion(*shield);
++      wl_surface_commit(shield->surface);
++    }
++  }
++}
++
++void PanelClickShield::reloadTouchKeyboard() {
++  m_keyboard.reset();
++  if (!m_keyboardPath.empty()) {
++    std::ifstream file(m_keyboardPath);
++    std::array<char, 4097> data{};
++    file.read(data.data(), data.size());
++    const auto n = file.gcount();
++    if (n > 0 && n <= 4096) {
++      auto j = nlohmann::json::parse(data.data(), data.data()+n, nullptr, false);
++      m_keyboard = touch_keyboard::parse(j);
++      if (m_keyboard && kill(m_keyboard->pid, 0) != 0) m_keyboard.reset();
++    }
++  }
++  refreshInputRegions();
++  m_keyboardLivenessTimer.stop();
++  if (m_keyboard && !m_shields.empty()) {
++    m_keyboardLivenessTimer.startRepeating(std::chrono::seconds(1), [this] {
++      if (m_keyboard && kill(m_keyboard->pid, 0) != 0) {
++        m_keyboard.reset();
++        refreshInputRegions();
++        m_keyboardLivenessTimer.stop();
++      }
++    });
++  }
++}
+ 
+ bool PanelClickShield::ensureSharedBuffer() {
+   if (m_buffer != nullptr) {
+@@ -129,6 +181,7 @@
+       m_shields.emplace(output, std::move(shield));
+     }
+   }
++  reloadTouchKeyboard();
+ }
+ 
+ void PanelClickShield::setPanelInputRect(wl_output* output, InputRect rect) {
+@@ -208,6 +261,7 @@
+ }
+ 
+ void PanelClickShield::deactivate() {
++  m_keyboardLivenessTimer.stop();
+   for (auto& [output, shield] : m_shields) {
+     if (shield) {
+       destroyShield(*shield);
+@@ -316,6 +370,17 @@
+     wl_region_subtract(region, r.x, r.y, r.width, r.height);
+   }
+ 
++  if (m_keyboard) {
++    for (const auto& output : m_wayland->outputs()) {
++      if (output.output != shield.output) continue;
++      for (const auto& r : touch_keyboard::rectangles(*m_keyboard,
++          output.logicalX, output.logicalY, output.effectiveLogicalWidth(), output.effectiveLogicalHeight(),
++          shield.width, shield.height)) {
++        wl_region_subtract(region, r[0], r[1], r[2], r[3]);
++      }
++      break;
++    }
++  }
+   wl_surface_set_input_region(shield.surface, region);
+   wl_region_destroy(region);
+ }
+--- a/src/shell/panel/panel_manager.h
++++ b/src/shell/panel/panel_manager.h
+@@ -19,6 +19,7 @@
+ #include <unordered_set>
+ 
+ class ConfigService;
++class FileWatcher;
+ class CompositorPlatform;
+ class ContextMenuPopup;
+ class SelectDropdownPopup;
+@@ -59,7 +60,7 @@
+   static PanelManager& instance();
+   static PanelManager* current() noexcept;
+ 
+-  void initialize(CompositorPlatform& platform, ConfigService* config, RenderContext* renderContext);
++  void initialize(CompositorPlatform& platform, ConfigService* config, RenderContext* renderContext, FileWatcher* files = nullptr);
+ 
+   // Optional: invoked from shell UI (e.g. control center) to spawn the standalone settings toplevel.
+   void setOpenSettingsWindowCallback(std::function<void(std::string)> callback);
+--- a/src/shell/panel/panel_manager.cpp
++++ b/src/shell/panel/panel_manager.cpp
+@@ -391,11 +391,11 @@
+   return m_platform != nullptr ? &m_platform->wayland() : nullptr;
+ }
+ 
+-void PanelManager::initialize(CompositorPlatform& platform, ConfigService* config, RenderContext* renderContext) {
++void PanelManager::initialize(CompositorPlatform& platform, ConfigService* config, RenderContext* renderContext, FileWatcher* files) {
+   m_platform = &platform;
+   m_config = config;
+   m_renderContext = renderContext;
+-  m_clickShield.initialize(platform.wayland());
++  m_clickShield.initialize(platform.wayland(), files);
+   m_persistentHost.initialize(platform, config, renderContext);
+ }
+ 
+--- a/src/app/application_ui.cpp
++++ b/src/app/application_ui.cpp
+@@ -523,7 +523,7 @@
+ 
+ void Application::initPanelManagerAndPanels() {
+   // Panel manager must be before bar so widgets can access PanelManager::instance()
+-  m_panelManager.initialize(m_compositorPlatform, &m_configService, &m_renderContext);
++  m_panelManager.initialize(m_compositorPlatform, &m_configService, &m_renderContext, &m_fileWatcher);
+   m_panelManager.setOpenSettingsWindowCallback([this](std::string context) {
+     m_settingsWindow.open(std::move(context));
+   });

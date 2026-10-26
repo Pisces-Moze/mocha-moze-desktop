@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-26",
+  "kernel": "6.12.111-moze.1-native-vde2",
+  "memory_cgroup": false,
+  "native_freezer_check": {
+    "freeze_confirmed": true,
+    "counter_stopped": true,
+    "focus_thaw_confirmed": true,
+    "oom_priority_restored": true,
+    "counter_before": 1,
+    "counter_frozen": 1,
+    "counter_after": 6
+  },
+  "browser_addon": {
+    "id": "{c2c003ee-bd69-42a2-b0e9-6f34222cb046}",
+    "version": "0.7.7",
+    "active": true,
+    "signedState": 2,
+    "userDisabled": false,
+    "appDisabled": false
+  },
+  "zram": {
+    "existing_device_preserved": true,
+    "logical_total_mib": 768,
+    "extra_logical_mib": 384,
+    "extra_physical_limit_mib": 128,
+    "algorithm": "lz4"
+  },
+  "opaque_maximized": "Niri per-window opacity toggle; client-defined alpha retained",
+  "freezer_rss_kib": 19620,
+  "sources": {
+    "/usr/local/libexec/mocha-app-freezer.py": "b9c52467b31ab0691b5f3b4eb14eaff2deeaa2785ea5e3c691c0ee2709277fcf",
+    "/usr/local/bin/app2unit": "71b3cbd03f38de3e6f088e661f6687c28d3273a186bff491943779004b59023b"
+  },
+  "repeated_clipboard_notifications": "same process survived two consecutive notifications",
+  "final_sync_date": "2026-10-27",
+  "protection": {
+    "audio_protection_available": true,
+    "clipboard_protection_available": true
+  }
+}

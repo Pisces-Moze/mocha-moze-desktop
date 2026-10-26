@@ -22,6 +22,9 @@ fi
 if [ "${MOCHA_FRAME_PROFILE_BUILD:-0}" = 1 ]; then
  apply_patch "$src" "$repo/patches/0011-niri-frame-profile.patch"
 fi
+if [ "${MOCHA_WALLPAPER_VISIBILITY:-0}" = 1 ]; then
+ apply_patch "$src" "$repo/patches/vde/0016-niri-wallpaper-visibility.patch"
+fi
 if [ "${MOCHA_TABLET_GESTURES:-0}" = 1 ]; then
  # Verify the upstream-authored, GPL-3.0 tablet patches before applying in order.
  python3 - "$repo/patches/tablet" <<'PY'
@@ -34,6 +37,16 @@ PY
  for patch_file in "$repo"/patches/tablet/*.patch; do
   apply_patch "$src" "$patch_file"
  done
+fi
+apply_patch "$src" "$repo/patches/0022-niri-touch-keyboard-focus.patch"
+focus_test=$(mktemp)
+trap 'rm -f "$focus_test"' EXIT
+rustc --edition=2021 --test "$src/src/shell_keyboard_focus.rs" -o "$focus_test"
+"$focus_test"
+if [ "${MOCHA_WALLPAPER_VISIBILITY:-0}" = 1 ]; then
+ apply_patch "$src" "$repo/patches/vde/0018-niri-workarea-coverage.patch"
+ rustc --edition=2021 --test "$src/src/workspace_coverage.rs" -o "$focus_test"
+ "$focus_test"
 fi
 python3 - "$src/vendor/smithay" <<'PY'
 import sys,json,hashlib

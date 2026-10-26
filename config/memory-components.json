@@ -1,0 +1,20 @@
+{
+  "app2unit": {
+    "repository": "https://github.com/Vladimir-csp/app2unit",
+    "commit": "47e23ec6ab9e97bbe335c32fb640744a29bf32f7",
+    "license": "GPL-3.0",
+    "script_sha256_lf": "71b3cbd03f38de3e6f088e661f6687c28d3273a186bff491943779004b59023b"
+  },
+  "auto_tab_discard": {
+    "repository": "https://github.com/rNeomy/auto-tab-discard",
+    "version": "0.7.7",
+    "id": "{c2c003ee-bd69-42a2-b0e9-6f34222cb046}",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5111461/auto_tab_discard-0.7.7.xpi",
+    "sha256": "cdd4d4467e7e091469f6edad0213461d90736f6e7fc8234666525cca763753c3"
+  },
+  "debian_packages": {
+    "earlyoom": "1.8.2-1",
+    "pulseaudio-utils": "17.0+dfsg1-2+b1",
+    "systemd-zram-generator": "1.2.1-2"
+  }
+}

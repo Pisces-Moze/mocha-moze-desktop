@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-23",
+  "status": "cross-build-running; not installed",
+  "patch": "patches/0024-firefox-v4l2-request.patch",
+  "source": "Debian security 153.5.1esr-1~deb13u1; signed APT metadata; TUNA mirror",
+  "tested": {
+    "descriptor_cases": 27,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "cross_configure": "pass; ARMv7 hard-float, clang19, Rust1.95",
+    "active_ffmpeg61_cpp_target": "pass after startup-pref accessor correction; one 32-bit range warning"
+  },
+  "limitations": [
+    "VDE constrained Baseline progressive 8-bit YUV420 only",
+    "CABAC and other incompatible streams retain software decoding",
+    "No live Firefox hardware-decode acceptance yet",
+    "User rebooted after a desktop freeze; cause unconfirmed"
+  ],
+  "sandbox": {
+    "rdd_enabled": true,
+    "site_isolation_preserved": true,
+    "default_request_pref": false
+  },
+  "patch_sha256": "8d8bf3f75d84133056f3961221aa91a951642177556a3e2d565e71a2d6c5604f"
+}

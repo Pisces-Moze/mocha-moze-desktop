@@ -1,0 +1,284 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -26,6 +26,16 @@
+ local lastPresent = {}      -- Map of connector -> true (monitors seen last tick)
+ local isPaused = {}         -- Map of connector -> true (paused monitors)
+ local currentPath = {}      -- Map of connector -> file mpv is actually showing right now (slideshow only)
++local generations = {}
++local staticRequest = 0
++local staticSelection = nil
++local function nextGeneration(connector)
++  generations[connector] = (generations[connector] or 0) + 1
++  return generations[connector]
++end
++local function currentSelection(connector, path, generation)
++  return assignments[connector] == path and generations[connector] == generation
++end
+ local available = false     -- Is mpvpaper binary installed?
+ local mpvpaperSupportsAutoMode = false -- resolved at boot, before any launch
+ local socatAvailable = nil
+@@ -102,7 +112,8 @@
+   noctalia.writeFile(STATE_FILE, noctalia.json.encode({
+     assignments = assignments,
+     lastAssignments = lastAssignments,
+-    launchedAsSystemd = launchedAsSystemd
++    launchedAsSystemd = launchedAsSystemd,
++    staticSelection = staticSelection
+   }) or "")
+ end
+ 
+@@ -115,6 +126,7 @@
+         assignments = decoded.assignments
+         lastAssignments = decoded.lastAssignments or {}
+         launchedAsSystemd = decoded.launchedAsSystemd or {}
++        staticSelection = decoded.staticSelection
+       else
+         assignments = decoded
+       end
+@@ -235,18 +247,20 @@
+ 
+ -- When systemd is disabled, we cannot freeze the process. We fallback to killing
+ -- the video and extracting a static frame to use as the Noctalia wallpaper.
+-local function extractStaticWallpaper(connector, videoPath)
++local function extractStaticWallpaper(connector, videoPath, generation, request)
+   if not cfg("extract_last_frame") then
+     forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
+     return
+   end
+ 
+   noctalia.runAsync("mkdir -p " .. shellQuote(CACHE_DIR), function()
++    if generations[connector] ~= generation or staticRequest ~= request then return end
+     local outPath = CACHE_DIR .. "/" .. connector:gsub("[^%w%-]", "_") .. "_static.jpg"
+     local cmd = "ffmpeg -y -ss 1 -i " .. shellQuote(videoPath) .. " -frames:v 1 -q:v 2 " .. shellQuote(outPath)
+ 
+-    noctalia.runAsync(cmd, function(success)
+-      if success and noctalia.fileExists(outPath) then
++    noctalia.runAsync(cmd, function(result)
++      if generations[connector] ~= generation or staticRequest ~= request then return end
++      if type(result) == "table" and result.exitCode == 0 and noctalia.fileExists(outPath) then
+         forEachOutput(connector, function(name)
+           noctalia.setWallpaper(name, outPath)
+           noctalia.setWallpaperEnabled(name, true)
+@@ -263,6 +277,7 @@
+ end
+ 
+ local function updateStaticWallpaper(connector, videoPath)
++  local generation = generations[connector]
+   local outPath = cachePath(videoPath)
+ 
+   if noctalia.fileExists(outPath) then
+@@ -275,8 +290,10 @@
+   if not cfg("extract_last_frame") then return end
+ 
+   noctalia.runAsync("mkdir -p " .. shellQuote(CACHE_DIR), function()
++    if not currentSelection(connector, videoPath, generation) then return end
+     local cmd = "ffmpeg -y -ss 1 -i " .. shellQuote(videoPath) .. " -frames:v 1 -q:v 2 " .. shellQuote(outPath)
+     noctalia.runAsync(cmd, function(result)
++      if not currentSelection(connector, videoPath, generation) then return end
+       if type(result) == "table" and result.exitCode == 0 and noctalia.fileExists(outPath) then
+         forEachOutput(connector, function(name)
+           noctalia.setWallpaper(name, outPath)
+@@ -408,6 +425,10 @@
+   isPaused[connector] = false
+   currentPath[connector] = nil
+ 
++  -- Wait for the exact output's decoder/holder to exit before handing the
++  -- wallpaper surface back. Sending SIGTERM alone is not completion.
++  killCmd = killCmd .. " ; i=0; while pgrep -f -- " .. pattern ..
++    " >/dev/null && [ $i -lt 40 ]; do sleep 0.05; i=$((i+1)); done; ! pgrep -f -- " .. pattern .. " >/dev/null"
+   if callback then
+     noctalia.runAsync(killCmd, callback)
+   else
+@@ -419,6 +440,7 @@
+ -- When a slideshow is active, we start mpvpaper against the generated
+ -- playlist; when it is disabled, we just point it at the single file.
+ local function startMpvpaper(connector, path)
++  local generation = nextGeneration(connector)
+   -- Temporarily set the cached thumbnail as the background to prevent black screens during startup.
+   local thumb = CACHE_DIR .. "/" .. path:gsub("[^%w]", "_") .. ".jpg"
+   local target = resolveTarget(connector, path)
+@@ -430,7 +452,12 @@
+     end)
+   end
+ 
+-  killMpvpaper(connector, function()
++  killMpvpaper(connector, function(result)
++    if not currentSelection(connector, path, generation) then return end
++    if type(result) ~= "table" or result.exitCode ~= 0 then
++      noctalia.log("mpvpaper: old player did not exit; launch cancelled")
++      return
++    end
+     launchedAsSystemd[connector] = cfg("run_as_systemd")
+     persist()
+     local flags = mpvpaperFlags()
+@@ -455,6 +482,7 @@
+     -- Run mpvpaper in background
+     noctalia.runAsync("exec " .. cmd .. " >/dev/null 2>&1 &", function() end)
+     noctalia.runAsync("sleep 0.8", function()
++      if not currentSelection(connector, path, generation) then return end
+       forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, false) end)
+     end)
+   end)
+@@ -514,13 +542,16 @@
+   if type(connector) ~= "string" or connector == "" then return end
+ 
+   snapshotAssignments()
++  local generation = nextGeneration(connector)
++  local request = staticRequest
+   local path = assignments[connector]
+   assignments[connector] = nil
+   persist()
+ 
+   killMpvpaper(connector, function()
++    if generations[connector] ~= generation or staticRequest ~= request then return end
+     if path then
+-      extractStaticWallpaper(connector, path)
++      extractStaticWallpaper(connector, path, generation, request)
+     else
+       forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
+     end
+@@ -535,6 +566,9 @@
+ local function setVideo(connector, path)
+   if not available or type(connector) ~= "string" or connector == "" or type(path) ~= "string" or path == "" then return end
+ 
++  staticRequest = staticRequest + 1
++  staticSelection = nil
++
+   -- Resolve overlaps: clear specific assignments when applying globally, and vice versa.
+   if connector == "*" then
+     for conn in pairs(assignments) do
+@@ -550,6 +584,50 @@
+   startMpvpaper(connector, path)
+ 
+   publish()
++end
++
++-- Apply a static selection as one transaction. A stale frame extraction or
++-- delayed video launch must never overwrite this newer selection.
++local function setStatic(path)
++  if type(path) ~= "string" or path == "" or not noctalia.fileExists(path) then return end
++  staticRequest = staticRequest + 1
++  local request = staticRequest
++  -- This is an explicit user choice, unlike the lock hook's clear-all.
++  -- Reapply after an unlock must not resurrect an older video selection.
++  lastAssignments = {}
++  local connectors = {}
++  for conn in pairs(assignments) do connectors[conn] = true end
++  for conn in pairs(generations) do connectors[conn] = true end
++  if next(connectors) == nil then connectors["*"] = true end
++  assignments = {}
++  staticSelection = nil
++  persist()
++  publish()
++  local remaining = 0
++  for conn in pairs(connectors) do
++    nextGeneration(conn)
++    remaining = remaining + 1
++  end
++  local failed = false
++  for conn in pairs(connectors) do
++    killMpvpaper(conn, function(result)
++      if staticRequest ~= request then return end
++      if type(result) ~= "table" or result.exitCode ~= 0 then failed = true end
++      remaining = remaining - 1
++      if remaining ~= 0 then return end
++      if failed then
++        noctalia.log("mpvpaper: static handover cancelled because a player is still running")
++        return
++      end
++      for _, output in ipairs(noctalia.outputs()) do
++        noctalia.setWallpaper(output.name, path)
++        noctalia.setWallpaperEnabled(output.name, true)
++      end
++      staticSelection = path
++      persist()
++      publish()
++    end)
++  end
+ end
+ 
+ -- ==============================================================================
+@@ -633,6 +711,8 @@
+ -- Handles both direct processes (pkill) and systemd scopes (systemctl stop),
+ -- including thawing frozen/paused instances before sending SIGTERM.
+ function onExit(signal)
++  staticRequest = staticRequest + 1
++  for connector in pairs(generations) do nextGeneration(connector) end
+   for connector in pairs(assignments) do
+     killMpvpaper(connector, nil, signal)
+   end
+@@ -643,12 +723,18 @@
+ -- ==============================================================================
+ 
+ function onIpc(event, payload)
+-  if event == "clear-all" then
++  if event == "set-static" then
++    setStatic(payload)
++  elseif event == "clear-all" then
++    staticRequest = staticRequest + 1
++    local request = staticRequest
+     snapshotAssignments()
+     for connector, path in pairs(assignments) do
++      local generation = nextGeneration(connector)
+       killMpvpaper(connector, function()
++        if generations[connector] ~= generation or staticRequest ~= request then return end
+         if path then
+-          extractStaticWallpaper(connector, path)
++          extractStaticWallpaper(connector, path, generation, request)
+         else
+           forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
+         end
+--- a/config/noctalia/tools/wallpaper_picker/backend.py
++++ b/config/noctalia/tools/wallpaper_picker/backend.py
+@@ -53,29 +53,29 @@
+ 
+ 
+ def apply_static_wallpaper(path: str) -> bool:
+-    """Apply static wallpaper, clear mpvpaper video assignments, and restore host wallpaper rendering."""
++    """Let the plugin complete decoder teardown and static handover once."""
++    if not os.path.isfile(path):
++        return False
+     try:
+-        # 1. Notify Noctalia's mpvpaper service to clear assignments and re-enable static wallpaper layer
+-        try:
+-            subprocess.run(
+-                ["noctalia", "msg", "plugin", "noctalia/mpvpaper:service", "all", "clear-all"],
+-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2, check=False
+-            )
+-        except Exception:
+-            pass
+-
+-        # 2. Clear mpvpaper assignments file directly as fallback
+-        _write_mpvpaper_assignments({})
+-
+-        # 3. Terminate any running mpvpaper instances with process wait
+-        _clear_mpvpaper()
+-
+-        # 4. Apply through Noctalia so it can refresh the palette and wallpaper layer
+-        subprocess.Popen(["noctalia", "msg", "wallpaper-set", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+-        return True
+-    except Exception as e:
+-        print(f"Error applying static wallpaper: {e}", file=sys.stderr)
+-        return False
++        result = subprocess.run(
++            ["noctalia", "msg", "plugin", "noctalia/mpvpaper:service", "all", "set-static", path],
++            capture_output=True, text=True, timeout=5, check=False,
++        )
++        if result.returncode or not result.stdout.startswith("ok:"):
++            return False
++        deadline = time.monotonic() + 5
++        while time.monotonic() < deadline:
++            try:
++                with open(ASSIGNMENTS_FILE, encoding="utf-8") as stream:
++                    state = json.load(stream)
++                if not state.get("assignments") and state.get("staticSelection") == path:
++                    return True
++            except (OSError, ValueError, AttributeError):
++                pass
++            time.sleep(0.05)
++    except (OSError, subprocess.TimeoutExpired) as error:
++        print(f"Error applying static wallpaper: {error}", file=sys.stderr)
++    return False
+ 
+ 
+ def apply_dynamic_wallpaper(video_path: str, thumb_path: str = None) -> bool:

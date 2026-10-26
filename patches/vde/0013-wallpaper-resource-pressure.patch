@@ -1,0 +1,371 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -26,6 +26,13 @@
+ local lastPresent = {}      -- Map of connector -> true (monitors seen last tick)
+ local isPaused = {}         -- Map of connector -> true (paused monitors)
+ local currentPath = {}      -- Map of connector -> file mpv is actually showing right now (slideshow only)
++local pressureActive = false
++local pressureReason = nil
++local pressureReleased = {}
++local resumePositions = {}
++local pressureBadSince = nil
++local pressureGoodSince = nil
++local freezeMpvpaper
+ local generations = {}
+ local staticRequest = 0
+ local staticSelection = nil
+@@ -153,7 +160,12 @@
+ local function publish()
+   noctalia.state.set("assignments", assignments)
+   noctalia.state.set("available", available)
+-  noctalia.state.set("paused", isPaused)
++  local paused = {}
++  for k, v in pairs(isPaused) do paused[k] = v end
++  for k in pairs(pressureReleased) do paused[k] = true end
++  noctalia.state.set("paused", paused)
++  noctalia.state.set("resourcePaused", pressureActive)
++  noctalia.state.set("resourceReason", pressureReason)
+ end
+ 
+ -- ==============================================================================
+@@ -168,6 +180,10 @@
+   if backend ~= "v4l2request" and backend ~= "v4l2request-copy" then backend = "auto" end
+   table.insert(parts, "hwdec=" .. (cfg("hardware_decode") and backend or "no"))
+   table.insert(parts, "input-ipc-server=" .. ipcSocketPath(connector))
++  local resume = resumePositions[connector]
++  if resume and resume.path == assignments[connector] and type(resume.position) == "number" then
++    table.insert(parts, "start=" .. tostring(resume.position))
++  end
+ 
+   local extra = cfg("mpv_options")
+   if type(extra) == "string" and extra ~= "" then table.insert(parts, extra) end
+@@ -441,6 +457,17 @@
+ -- playlist; when it is disabled, we just point it at the single file.
+ local function startMpvpaper(connector, path)
+   local generation = nextGeneration(connector)
++  if pressureActive then
++    local paused = isPaused[connector] == true
++    pressureReleased[connector] = { path = path, wasPaused = paused }
++    killMpvpaper(connector, function()
++      if currentSelection(connector, path, generation) then
++        forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
++      end
++    end)
++    publish()
++    return
++  end
+   -- Temporarily set the cached thumbnail as the background to prevent black screens during startup.
+   local thumb = CACHE_DIR .. "/" .. path:gsub("[^%w]", "_") .. ".jpg"
+   local target = resolveTarget(connector, path)
+@@ -463,8 +490,10 @@
+     local flags = mpvpaperFlags()
+     local cmd = "mpvpaper "
+     if flags ~= "" then cmd = cmd .. flags .. " " end
++    local resume = resumePositions[connector]
+     cmd = cmd .. "-o " .. shellQuote(mpvOptions(connector)) .. " " .. shellQuote(connector) .. " " .. shellQuote(target) -- mpvpaper -o [mpv-options] [connector] [video-path]
+ 
++    resumePositions[connector] = nil
+     local nice = cfg("nice")
+     if type(nice) == "number" and nice ~= 0 then
+       cmd = "nice -n " .. tostring(nice) .. " " .. cmd
+@@ -484,6 +513,7 @@
+     noctalia.runAsync("sleep 0.8", function()
+       if not currentSelection(connector, path, generation) then return end
+       forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, false) end)
++      if resume and resume.wasPaused then freezeMpvpaper(connector) end
+     end)
+   end)
+ end
+@@ -492,7 +522,7 @@
+ -- ── PAUSE / RESUME / TOGGLE ────────────────────────────────────────────────
+ -- ==============================================================================
+ 
+-local function freezeMpvpaper(connector)
++freezeMpvpaper = function(connector)
+   isPaused[connector] = true
+   if cfg("run_as_systemd") then
+     local unitName = unitNameFor(connector)
+@@ -546,6 +576,8 @@
+   local request = staticRequest
+   local path = assignments[connector]
+   assignments[connector] = nil
++  pressureReleased[connector] = nil
++  resumePositions[connector] = nil
+   persist()
+ 
+   killMpvpaper(connector, function()
+@@ -568,6 +600,8 @@
+ 
+   staticRequest = staticRequest + 1
+   staticSelection = nil
++  pressureReleased[connector] = nil
++  resumePositions[connector] = nil
+ 
+   -- Resolve overlaps: clear specific assignments when applying globally, and vice versa.
+   if connector == "*" then
+@@ -595,6 +629,8 @@
+   -- This is an explicit user choice, unlike the lock hook's clear-all.
+   -- Reapply after an unlock must not resurrect an older video selection.
+   lastAssignments = {}
++  pressureReleased = {}
++  resumePositions = {}
+   local connectors = {}
+   for conn in pairs(assignments) do connectors[conn] = true end
+   for conn in pairs(generations) do connectors[conn] = true end
+@@ -630,6 +666,109 @@
+   end
+ end
+ 
++-- Severe pressure policy stays inside the existing 1 Hz service. No process
++-- scan, shell command or extra polling daemon runs in the healthy steady state.
++local function pressureNumber(key, default, minimum, maximum)
++  local value = cfg(key)
++  if type(value) ~= "number" then value = default end
++  return math.max(minimum, math.min(maximum, value))
++end
++
++local function psi(path, kind)
++  local text = noctalia.readFile(path)
++  if type(text) ~= "string" then return nil end
++  return tonumber(text:match(kind .. "%s+avg10=([%d%.]+)"))
++end
++
++local function releaseUnderPressure(connector, path)
++  local generation = nextGeneration(connector)
++  local released = { path = path, wasPaused = isPaused[connector] == true }
++  pressureReleased[connector] = released
++  local function finish(result)
++    if not pressureActive or not currentSelection(connector, path, generation) then return end
++    if result and type(result.stdout) == "string" then
++      local value = tonumber(result.stdout:match('"data"%s*:%s*([%d%.]+)'))
++      if value and value >= 0 and value < 2678400 then released.position = value end
++    end
++    killMpvpaper(connector, function(result)
++      if not currentSelection(connector, path, generation) then return end
++      if type(result) ~= "table" or result.exitCode ~= 0 then
++        pressureReleased[connector] = nil
++        noctalia.log("mpvpaper: pressure release did not finish; will retry")
++        return
++      end
++      forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
++      publish()
++    end)
++  end
++  if noctalia.fileExists(ipcSocketPath(connector)) and noctalia.commandExists("socat") then
++    local query = '{"command":["get_property","time-pos"]}'
++    noctalia.runAsync("printf '%s\n' " .. shellQuote(query) .. " | socat -t 0.3 - " ..
++      shellQuote("UNIX-CONNECT:" .. ipcSocketPath(connector)), finish)
++  else
++    finish(nil)
++  end
++end
++
++local function updateResourcePressure()
++  local wasActive = pressureActive
++  local now = noctalia.nowMs() / 1000
++  local enabled = cfg("pause_on_pressure") == true
++  local info = noctalia.readFile("/proc/meminfo")
++  local available = type(info) == "string" and tonumber(info:match("MemAvailable:%s+(%d+)")) or nil
++  if available then available = available / 1024 end
++  local low = pressureNumber("pressure_low_mib", 128, 32, 2048)
++  local high = math.max(low + 64, pressureNumber("pressure_resume_mib", 256, 96, 4096))
++  local memory = psi("/proc/pressure/memory", "full")
++  local cpu = psi("/proc/pressure/cpu", "some")
++  local bad = enabled and available and
++    (available < low or (memory and memory >= 5 and available < high) or
++      (cfg("pause_on_cpu_pressure") == true and cpu and cpu >= 85))
++  local reason = available and available < low and "memory" or
++    (memory and memory >= 5 and "memory-stall" or "cpu-stall")
++  local recovered = available and available >= high and
++      (not memory or memory < 1) and (not cpu or cpu < 25)
++  if bad then
++    pressureBadSince = pressureBadSince or now
++    pressureGoodSince = nil
++    local hold = pressureNumber("pressure_hold_seconds", 3, 1, 60)
++    if available < 64 or now - pressureBadSince >= hold then
++      pressureActive = true
++      pressureReason = reason
++    end
++  else
++    pressureBadSince = nil
++    if not enabled then
++      pressureGoodSince = now - 3600
++    elseif recovered then
++      pressureGoodSince = pressureGoodSince or now
++    else
++      pressureGoodSince = nil
++    end
++    local delay = pressureNumber("pressure_recovery_seconds", 15, 3, 300)
++    if pressureActive and pressureGoodSince and now - pressureGoodSince >= delay then
++      pressureActive = false
++      pressureReason = nil
++      for connector, released in pairs(pressureReleased) do
++        pressureReleased[connector] = nil
++        if assignments[connector] == released.path then
++          resumePositions[connector] = released
++          startMpvpaper(connector, released.path)
++        end
++      end
++      publish()
++    end
++  end
++  if pressureActive then
++    for connector, path in pairs(assignments) do
++      if not pressureReleased[connector] or pressureReleased[connector].path ~= path then
++        releaseUnderPressure(connector, path)
++      end
++    end
++  end
++  if wasActive ~= pressureActive then publish() end
++end
++
+ -- ==============================================================================
+ -- ── LIFECYCLE ──────────────────────────────────────────────────────────────
+ -- ==============================================================================
+@@ -663,6 +802,7 @@
+ -- active, keeping `assignments` and the static wallpaper texture in sync.
+ function update()
+   if not available then return end
++  updateResourcePressure()
+ 
+   if pendingSlideshowInterval ~= nil then
+     slideshowOverride = pendingSlideshowInterval
+@@ -672,7 +812,7 @@
+     applyAll()
+   end
+ 
+-  if not slideshowInterval() then return end
++  if pressureActive or not slideshowInterval() then return end
+   if not ensureSocatChecked() then return end
+   for connector in pairs(assignments) do
+     refreshCurrentFile(connector)
+--- a/plugin.toml
++++ b/plugin.toml
+@@ -137,6 +137,61 @@
+ step = 1
+ visible_when = { key = "run_as_systemd", values = ["true"] }
+ 
++
++[[setting]]
++key = "pause_on_pressure"
++type = "bool"
++label_key = "settings.pause_on_pressure.label"
++description_key = "settings.pause_on_pressure.description"
++default = true
++
++[[setting]]
++key = "pause_on_cpu_pressure"
++type = "bool"
++label_key = "settings.pause_on_cpu_pressure.label"
++description_key = "settings.pause_on_cpu_pressure.description"
++default = true
++
++[[setting]]
++key = "pressure_low_mib"
++type = "int"
++label_key = "settings.pressure_low_mib.label"
++description_key = "settings.pressure_low_mib.description"
++default = 128
++min = 32
++max = 2048
++step = 1
++
++[[setting]]
++key = "pressure_resume_mib"
++type = "int"
++label_key = "settings.pressure_resume_mib.label"
++description_key = "settings.pressure_resume_mib.description"
++default = 256
++min = 96
++max = 4096
++step = 1
++
++[[setting]]
++key = "pressure_hold_seconds"
++type = "int"
++label_key = "settings.pressure_hold_seconds.label"
++description_key = "settings.pressure_hold_seconds.description"
++default = 3
++min = 1
++max = 60
++step = 1
++
++[[setting]]
++key = "pressure_recovery_seconds"
++type = "int"
++label_key = "settings.pressure_recovery_seconds.label"
++description_key = "settings.pressure_recovery_seconds.description"
++default = 15
++min = 3
++max = 300
++step = 1
++
+ # Headless background service: owns the mpvpaper logic and per-output assignments.
+ [[service]]
+ id = "service"
+--- a/translations/en.json
++++ b/translations/en.json
+@@ -68,6 +68,30 @@
+         "request": "Tegra124 Request (DMA-BUF)",
+         "copy": "Tegra124 Request (CPU copy)"
+       }
++    },
++    "pause_on_pressure": {
++      "label": "Release video under severe pressure",
++      "description": "Unload the player under severe resource pressure and restore it after recovery."
++    },
++    "pause_on_cpu_pressure": {
++      "label": "Pause under severe CPU contention",
++      "description": "Release after sustained CPU PSI contention above 85%; normal panel interaction does not trigger it."
++    },
++    "pressure_low_mib": {
++      "label": "Low memory threshold (MiB)",
++      "description": "Release after the hold time below this available-memory level; below 64 MiB release immediately."
++    },
++    "pressure_resume_mib": {
++      "label": "Recovery memory threshold (MiB)",
++      "description": "Effective recovery level is at least 64 MiB above the low threshold; also requires low PSI and the recovery delay."
++    },
++    "pressure_hold_seconds": {
++      "label": "Pressure hold time (seconds)",
++      "description": "Ignore short pressure spikes."
++    },
++    "pressure_recovery_seconds": {
++      "label": "Recovery stability delay (seconds)",
++      "description": "Wait for stable recovery to avoid repeated stop/start cycles."
+     }
+   },
+   "slideshow": "Slideshow",
+--- a/translations/zh-Hans.json
++++ b/translations/zh-Hans.json
+@@ -68,6 +68,30 @@
+         "request": "Tegra124 Request (DMA-BUF)",
+         "copy": "Tegra124 Request (CPU copy)"
+       }
++    },
++    "pause_on_pressure": {
++      "label": "资源紧张时释放动态壁纸",
++      "description": "内存或系统资源严重不足时释放播放器，资源恢复后自动继续。"
++    },
++    "pause_on_cpu_pressure": {
++      "label": "严重 CPU 等待时暂停",
++      "description": "持续 CPU PSI 等待超过 85% 时释放；轻微菜单交互不会触发。"
++    },
++    "pressure_low_mib": {
++      "label": "低内存阈值 (MiB)",
++      "description": "可用内存低于此值并持续达到等待时间后释放；低于 64 MiB 立即释放。"
++    },
++    "pressure_resume_mib": {
++      "label": "恢复内存阈值 (MiB)",
++      "description": "至少比低阈值高 64 MiB，并满足恢复等待与低 PSI 条件。"
++    },
++    "pressure_hold_seconds": {
++      "label": "压力持续等待 (秒)",
++      "description": "短暂压力不启停播放器。"
++    },
++    "pressure_recovery_seconds": {
++      "label": "恢复稳定等待 (秒)",
++      "description": "资源稳定充足后再恢复，避免反复启停。"
+     }
+   },
+   "slideshow": "幻灯片放映",

@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-18",
+  "noctalia_version": "5.2.1",
+  "cpu_candidate": {
+    "before_binary_sha256": "22a8b14178abe4889230d0c98a53408e373a887d38d42e4a1242e1a1ad458971",
+    "binary_sha256": "6fcae5dea141cab54c7fbb2f605a8dde9eccca4fbba967457aecab47e92fdc22",
+    "binary_size": 14182292,
+    "patch_sha256": "093c011ee417b338cab73394842613445ddf59d8587eb1e51a23f43bdffc872f",
+    "host_scheduler_asan_ubsan_passed": true,
+    "unpatched_scheduler_failed": true,
+    "installed_on_device": true,
+    "before_stripped_binary_sha256": "450cfeec5be79728268e02affb961b0ad80a3dea246f4cbb1226c49970359b42",
+    "baseline_assertion_verified": true,
+    "predecessor_is_exact_live_binary": false,
+    "recognized_live_binary_sha256": "c375a31ef4ee0f26cc005d0963f9b275142c3ba7998f11ddfe8e82d2d236465a",
+    "source_prerequisites": {
+      "optional_robustness": true,
+      "arm_luau_alignment": true,
+      "native_dock_icons": true,
+      "touch_lock_keyboard": true,
+      "touch_lock_theme_and_layout_preserved": true
+    },
+    "device_running_sha256": "6fcae5dea141cab54c7fbb2f605a8dde9eccca4fbba967457aecab47e92fdc22",
+    "static_desktop_samples": {
+      "wallpaper_stopped": true,
+      "panels_closed_and_unlocked": true,
+      "cpu_governor": "schedutil",
+      "cpu_limits_khz": [
+        204000,
+        1020000
+      ],
+      "before_whole_system_busy_percent": [
+        4.27,
+        5.37
+      ],
+      "after_whole_system_busy_percent": [
+        4.67,
+        4.64
+      ],
+      "before_noctalia_percent_of_one_core": [
+        6.44,
+        9.65
+      ],
+      "after_noctalia_percent_of_one_core": [
+        8.3,
+        6.69
+      ],
+      "significant_cpu_reduction_demonstrated": false,
+      "short_samples_not_long_term_qualification": true
+    }
+  },
+  "scheduler_test": {
+    "methods_extracted_from_actual_source": true,
+    "renderer_mocked": true,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "pre_patch_hidden_tick_does_not_consume_update": true,
+    "post_patch_hidden_tick_quiesces": true,
+    "new_audio_and_preview_preserved_in_test": true
+  },
+  "picker_bridge": {
+    "python_tests": 5,
+    "service_source_lua_sandbox_test_passed": true,
+    "real_player_not_launched_by_host_tests": true,
+    "installed_on_device": true,
+    "paired_installer_precheck_backup_and_idempotence_passed": true,
+    "plugin_reloaded": true,
+    "managed_ipc_real_device_hardware_selection_passed": true,
+    "full_picker_gui_lock_restart_acceptance_pending": true
+  },
+  "panel_namespace_rule": {
+    "installed_on_device": true,
+    "user_feedback": "Slight improvement; CPU usage still high",
+    "compositor_binary_restored": true,
+    "full_wallpaper_performance_comparison_valid": false
+  },
+  "device_state": "VDE2 ordinary boot accepted by user and live release, driver, services, CPU/zram and managed hardware wallpaper checks",
+  "redundant_wallpaper_cleanup_executed": true,
+  "default_vde_kernel_installed": true,
+  "patch_sha256": {
+    "0018-noctalia-hidden-spectrum-idle.patch": "093c011ee417b338cab73394842613445ddf59d8587eb1e51a23f43bdffc872f",
+    "0010-noctalia-picker-managed-video.patch": "ad0a8f1fd1c9927e698b6e562157cdace61e7de091caf477cf800ee137af58f4",
+    "0011-nyxuri-picker-plugin-lifecycle.patch": "25aa33842ee9424af5194cf852cca5f0bbad9e1635ce16499c3b44a28a75f21f"
+  },
+  "superseded_cpu_candidate": {
+    "before_binary_sha256": "22a8b14178abe4889230d0c98a53408e373a887d38d42e4a1242e1a1ad458971",
+    "binary_sha256": "5d1628a9a284922dff19e345a8ffc82539d59d289a76f73c4779159ae4e86cda",
+    "binary_size": 14182292,
+    "patch_sha256": "093c011ee417b338cab73394842613445ddf59d8587eb1e51a23f43bdffc872f",
+    "host_scheduler_asan_ubsan_passed": true,
+    "unpatched_scheduler_failed": true,
+    "installed_on_device": false,
+    "before_stripped_binary_sha256": "450cfeec5be79728268e02affb961b0ad80a3dea246f4cbb1226c49970359b42",
+    "baseline_assertion_verified": true,
+    "superseded_before_device_install": true,
+    "reason": "Missing existing Dock linear icon compatibility; candidate rebuilt before activation"
+  },
+  "wallpaper_cleanup": {
+    "test_variants_removed": 3,
+    "video_bytes_reclaimed": 6438506,
+    "original_and_current_quality_version_preserved": true,
+    "local_verified_copies_preserved": true
+  },
+  "explicit_vde2": {
+    "built_in_optin": false,
+    "explicit_matching_module_loaded": true,
+    "gst_frames_matched": 96,
+    "ffmpeg_frames_matched": 96,
+    "low_rate_hardware_check_passed": true,
+    "lock_or_iommu_warnings_after_decode": false,
+    "managed_wallpaper_hwdec": "v4l2request",
+    "panel_overview_three_cycles": {
+      "wallpaper_kept_playing": true,
+      "sampled_video_and_decoder_drops": 0,
+      "whole_system_busy_percent": 37.81543562350341,
+      "graphics_cpu_percent_of_one_core": {
+        "niri": 45.85063887607241,
+        "noctalia": 12.255009469180644,
+        "mpvpaper": 24.1578634938446
+      }
+    },
+    "fullscreen_cycles_pending": false,
+    "fullscreen_resource_release": {
+      "cycles_passed": 3,
+      "holder_rss_kib": 1316,
+      "video_and_dma_buf_fds_while_fullscreen": 0,
+      "module_references_while_fullscreen": 0,
+      "runtime_suspended": true,
+      "resumed_request_decode": true,
+      "display_frame_drops_observed": true,
+      "decoder_frame_drops": 0
+    }
+  },
+  "runtime_policy": {
+    "installed_for_exact_vde2_release": true,
+    "regression_tests_passed": 10,
+    "hardware_rate_gate_preserved": true,
+    "bounded_trials_seconds": [
+      41.59,
+      40.47
+    ],
+    "bounded_trial_caps_mhz": [
+      612,
+      1020
+    ],
+    "cpu_and_swappiness_restored_after_trials": true,
+    "zram_lz4_logical_mib": 384,
+    "mixed_entropy_own_allocation_mib": 128,
+    "checksum_preserved": true,
+    "global_memory_pressure_tested": false,
+    "ordinary_boot_acceptance_pending": false
+  }
+}

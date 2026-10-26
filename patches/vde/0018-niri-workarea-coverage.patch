@@ -1,0 +1,148 @@
+--- /dev/null
++++ b/src/workspace_coverage.rs
+@@ -0,0 +1,65 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++//! Workspace coverage treats configured tiling gaps as decoration. The cached
++//! wallpaper remains behind translucent windows; only its live decoder exits.
++pub(crate) fn covers(area: [f64; 4], rects: impl IntoIterator<Item = [f64; 4]>, gap: f64) -> bool {
++    if area.iter().any(|x| !x.is_finite()) || area[2] <= 0. || area[3] <= 0. { return false; }
++    // Clients configure integer logical sizes. At fractional output scales,
++    // adjacent columns may leave up to two logical pixels of rounding fringe.
++    let gap = (if gap.is_finite() { gap.clamp(0., 32.) } else { 0. }) + 2.;
++    let mut remaining = vec![[area[0], area[1], area[0]+area[2], area[1]+area[3]]];
++    for r in rects.into_iter().take(256) {
++        if r.iter().any(|x| !x.is_finite()) || r[2] <= 0. || r[3] <= 0. { continue; }
++        let r = [r[0]-gap, r[1]-gap, r[0]+r[2]+gap, r[1]+r[3]+gap];
++        let mut next = Vec::new();
++        for u in remaining {
++            let x1 = u[0].max(r[0]); let y1 = u[1].max(r[1]);
++            let x2 = u[2].min(r[2]); let y2 = u[3].min(r[3]);
++            if x1 >= x2 || y1 >= y2 { next.push(u); continue; }
++            for piece in [[u[0],u[1],u[2],y1], [u[0],y2,u[2],u[3]],
++                          [u[0],y1,x1,y2], [x2,y1,u[2],y2]] {
++                if piece[2]-piece[0] > 0.01 && piece[3]-piece[1] > 0.01 { next.push(piece); }
++            }
++        }
++        if next.is_empty() { return true; }
++        // Highly fragmented scenes fail open instead of adding unbounded work
++        // to a presentation callback.
++        if next.len() > 128 { return false; }
++        remaining = next;
++    }
++    false
++}
++
++#[cfg(test)]
++mod tests {
++    use super::covers;
++    #[test]
++    fn maximized_window_and_decorative_gaps() {
++        let area = [0.,40.,1365.,984.];
++        assert!(covers(area, [[12.,52.,1341.,960.]], 12.));
++        assert!(!covers(area, [[12.,52.,1341.,960.]], 0.));
++        assert!(!covers(area, [[12.,52.,850.,960.]], 12.));
++    }
++    #[test]
++    fn tiled_union_holes_and_overlap() {
++        let a = [0.,0.,100.,100.];
++        assert!(covers(a, [[0.,0.,45.,100.],[55.,0.,45.,100.]], 5.));
++        assert!(!covers(a, [[0.,0.,40.,100.],[60.,0.,40.,100.]], 5.));
++        assert!(!covers(a, [[0.,0.,70.,70.],[30.,30.,70.,70.]], 0.));
++        assert!(covers(a, [[-10.,-10.,70.,120.],[50.,-10.,70.,120.]], 0.));
++    }
++    #[test]
++    fn fractional_output_and_integer_client_widths() {
++        let a = [0.,0.,1365.3333333333,1024.];
++        let columns = [[13.3333333333,12.,664.,1000.], [689.3333333333,12.,664.,1000.]];
++        assert!(covers(a, columns, 12.));
++        assert!(!covers(a, [[13.3333333333,12.,600.,1000.],columns[1]], 12.));
++    }
++    #[test]
++    fn other_output_invalid_and_empty() {
++        assert!(!covers([0.,0.,100.,100.], [], 12.));
++        assert!(!covers([0.,0.,100.,100.], [[1000.,0.,100.,100.]], 12.));
++        assert!(!covers([0.,0.,100.,100.], [[0.,0.,f64::NAN,100.]], 12.));
++        assert!(!covers([0.,0.,0.,100.], [[0.,0.,100.,100.]], 12.));
++        assert!(covers([0.,0.,100.,100.], [[0.,0.,100.,100.]], f64::NAN));
++    }
++}
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -26,6 +26,7 @@
+ pub mod window;
+ 
+ mod shell_keyboard_focus;
++mod workspace_coverage;
+ 
+ #[cfg(test)]
+ mod tests;
+--- a/src/layout/mod.rs
++++ b/src/layout/mod.rs
+@@ -1624,6 +1624,23 @@
+         Some(&mut mon.workspaces[mon.active_workspace_idx])
+     }
+ 
++    /// Settled active-workspace coverage, ignoring small configured tile gaps.
++    pub fn wallpaper_workarea_covered(&self, output: &Output) -> bool {
++        if self.interactive_move.is_some() || self.is_overview_open() { return false; }
++        let Some(mon) = self.monitor_for_output(output) else { return false; };
++        if mon.workspace_switch.is_some() { return false; }
++        let ws = mon.active_workspace_ref();
++        if ws.windows().next().is_none() { return false; }
++        let a = ws.working_area();
++        let rects = ws.tiles_with_render_positions().filter_map(|(tile, pos, visible)| {
++            if !visible { return None; }
++            let size = tile.tile_size();
++            Some([pos.x, pos.y, size.w, size.h])
++        });
++        crate::workspace_coverage::covers([a.loc.x, a.loc.y, a.size.w, a.size.h], rects,
++            ws.options.layout.gaps)
++    }
++
+     pub fn windows_for_output(&self, output: &Output) -> impl Iterator<Item = &W> + '_ {
+         let MonitorSet::Normal { monitors, .. } = &self.monitor_set else {
+             panic!()
+--- a/src/niri.rs
++++ b/src/niri.rs
+@@ -4961,7 +4961,8 @@
+         } else {
+             None
+         };
+-        crate::wallpaper_visibility::publish(&output.name(), visible, overview, shell_overlay_visible);
++        crate::wallpaper_visibility::publish(&output.name(), visible, overview, shell_overlay_visible,
++            self.layout.wallpaper_workarea_covered(output));
+ 
+         if let Some(surface) = &self.output_state[output].lock_surface {
+             with_surface_tree_downward(
+--- a/src/wallpaper_visibility.rs
++++ b/src/wallpaper_visibility.rs
+@@ -8,14 +8,14 @@
+ use std::os::unix::fs::OpenOptionsExt;
+ use std::sync::atomic::{AtomicU64, Ordering};
+ 
+-type Visibility = (Option<bool>, bool, bool);
++type Visibility = (Option<bool>, bool, bool, bool);
+ thread_local! {
+     static LAST: RefCell<HashMap<String, Visibility>> = RefCell::new(HashMap::new());
+ }
+ static SERIAL: AtomicU64 = AtomicU64::new(0);
+ 
+-pub(crate) fn publish(output: &str, visible: Option<bool>, overview: bool, shell_overlay: bool) {
+-    let state = (visible, overview, shell_overlay);
++pub(crate) fn publish(output: &str, visible: Option<bool>, overview: bool, shell_overlay: bool, workarea_covered: bool) {
++    let state = (visible, overview, shell_overlay, workarea_covered);
+     let changed = LAST.with(|last| {
+         let mut last = last.borrow_mut();
+         if last.get(output) == Some(&state) {
+@@ -34,8 +34,9 @@
+     let path = std::path::PathBuf::from(runtime)
+         .join(format!("mocha-niri-background-{pid}-{encoded}.json"));
+     let incoming = path.with_extension(format!("incoming-{}", SERIAL.fetch_add(1, Ordering::Relaxed)));
+-    let data = serde_json::json!({"schema": 1, "pid": pid, "output": output,
+-        "visible": visible, "overview": overview, "shell_overlay": shell_overlay});
++    let data = serde_json::json!({"schema": 2, "pid": pid, "output": output,
++        "visible": visible, "overview": overview, "shell_overlay": shell_overlay,
++        "workarea_covered": workarea_covered});
+     let result = (|| -> std::io::Result<()> {
+         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&incoming)?;
+         file.write_all(data.to_string().as_bytes())?;
