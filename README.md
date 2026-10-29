@@ -2,9 +2,9 @@
 
 ## 2026-10-27 源码同步
 
-本次汇总已经过实机阶段验证的桌面、壁纸生命周期、触屏输入、蓝牙面板、Mesa 和开机动画修改；各项证据及其限制保留在 `validation/`。新增的 [Pinyin 候选背景修复](tools/fix-fcitx-candidate-theme.py) 与候选条滚动复位仍待本轮实机安装确认。
+本次汇总已经过实机阶段验证的桌面、壁纸生命周期、触屏输入、蓝牙面板、Mesa 和开机动画修改；各项证据及其限制保留在 `validation/`。[Pinyin 候选背景修复](tools/fix-fcitx-candidate-theme.py) 与候选条滚动复位已于 10 月 28 日装入实机并重载，实际候选视觉验收仍待确认。桌面后的动画临时缓冲和用户态动画进程均为零，见 [检查记录](validation/input-animation-2026-10-28.json)。
 
-Firefox Request 解码补丁的完整构建因最终 Rust 链接进程被终止而中断，现按 Debian 支持的无 Rust LTO 配置重新构建；[构建及支持范围](tools/firefox-request/README.md)。尚未把浏览器端视频硬解列为实机通过。系统镜像与首次设置由 [Debian 总入口](https://github.com/Pisces-Moze/mocha-moze-debian/blob/main/docs/DISTRIBUTION.md) 管理。
+Firefox Request 解码补丁已修正旧 FFmpeg ABI 的编译条件，并按 Debian 支持的无 Rust LTO 配置完成完整构建（2026-10-30 核对 exit 0）；[构建及支持范围](tools/firefox-request/README.md)。尚未把浏览器端视频硬解列为实机通过。系统镜像与首次设置由 [Debian 总入口](https://github.com/Pisces-Moze/mocha-moze-debian/blob/main/docs/DISTRIBUTION.md) 管理。
 
 > 为跑 Debian armhf 的小米平板 1 提供横屏 Niri 桌面，以及与桌面方向一致的最小充电界面。
 

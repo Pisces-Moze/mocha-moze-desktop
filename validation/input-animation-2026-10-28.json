@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-28",
+  "kernel": "6.12.111-moze.1-native-vde2",
+  "input_method": {
+    "theme_fix_installed": true,
+    "generated_theme_and_both_templates_repaired": true,
+    "classicui_reload_returncode": 0,
+    "keyboard_scroll_reset_installed": true,
+    "backup": "/var/backups/mocha-fcitx-20261027",
+    "visual_candidate_acceptance": "pending; automated GTK fixture entered Latin text rather than producing a Pinyin candidate list",
+    "user_input_or_passwords_logged": false
+  },
+  "animation_after_desktop": {
+    "active_vt": 1,
+    "kd_mode": "KD_GRAPHICS",
+    "vmalloc_allocations_from_moze_native_attach": 0,
+    "userspace_animation_processes": 0,
+    "source_cleanup": "Graphics VT detaches animation, cancels delayed work, restores fbops and releases text/coverage buffers",
+    "desktop_visible": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "checked_on": "2026-10-30",
+  "source": "Debian firefox-esr 153.5.1esr-1~deb13u1",
+  "target": "arm-linux-gnueabihf",
+  "rust_lto": "-Clto=off",
+  "parallel_jobs": 1,
+  "full_build_exit": 0,
+  "evidence_log": "build-20261028.log",
+  "evidence_exit": "build-20261028.exit",
+  "old_ffmpeg_abi_guard": "MOZ_USE_HWDECODE",
+  "installed_on_tablet": false,
+  "rdd_sandbox_disabled": false,
+  "browser_hardware_decode_acceptance": "pending"
+}

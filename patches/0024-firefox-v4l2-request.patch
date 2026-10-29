@@ -25,7 +25,7 @@
            break;
        }
  #else
-+#  if defined(MOZ_WIDGET_GTK) && defined(MOZ_ENABLE_V4L2)
++#  if defined(MOZ_WIDGET_GTK) && defined(MOZ_ENABLE_V4L2) && defined(MOZ_USE_HWDECODE)
 +      // A Request-only probe does not imply arbitrary H264 profile support.
 +      // Keep the software support above for CABAC or absent stream metadata.
 +      if (codecId != AV_CODEC_ID_H264 || gfx::gfxVars::UseH264HwDecode() ||
