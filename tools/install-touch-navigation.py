@@ -44,6 +44,7 @@ def section(text, name, values):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--adapter', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--offline', action='store_true', help='Prepare configuration without a live Niri session')
     args = parser.parse_args()
     if os.geteuid() == 0:
         parser.error('Run as the desktop user')
@@ -108,7 +109,8 @@ def main():
         pending = path.with_name(path.name + '.new')
         pending.write_text(value, encoding='utf-8', newline='\n')
         os.replace(pending, path)
-    subprocess.run(['niri', 'msg', 'action', 'load-config-file'], check=True)
+    if not args.offline:
+        subprocess.run(['niri', 'msg', 'action', 'load-config-file'], check=True)
     print('TOUCH_NAV_INSTALLED backup=' + str(backup))
 
 

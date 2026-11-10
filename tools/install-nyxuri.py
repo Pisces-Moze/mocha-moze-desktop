@@ -37,6 +37,8 @@ def main():
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--offline", action="store_true",
+                        help="Prepare configuration for first boot without a running user session")
     args = parser.parse_args()
     if os.geteuid() == 0:
         parser.error("Run as the desktop user, with that user's HOME")
@@ -190,18 +192,35 @@ def main():
         from nyxuri.modules.gtktheme import gtktheme_install
         if not fcitx_install() or not gtktheme_install():
             raise RuntimeError(f"Theme module installation failed; backup: {backup}")
-        subprocess.run([sys.executable, str(args.adapter / 'tools/fix-fcitx-candidate-theme.py'),
-                        '--home', str(home), '--source', str(source)], check=True)
+        fix_theme = [sys.executable, str(args.adapter / 'tools/fix-fcitx-candidate-theme.py'),
+                     '--home', str(home)]
+        if not args.offline:
+            fix_theme.extend(['--source', str(source)])
+        subprocess.run(fix_theme, check=True)
         record = home / ".local/state/nyxuri/mocha-full-installed.json"
         record.write_text(json.dumps({"upstream": PIN, "backup": str(backup), "modules": names,
             "hardware": {"transform": 270, "scale": 1.5, "render_node": "renderD128"}}, indent=2) + "\n")
         units = home / '.config/systemd/user'
         units.mkdir(parents=True, exist_ok=True)
         shutil.copy2(args.adapter / 'tablet/mocha-nyxuri-shell.service', units / 'mocha-nyxuri-shell.service')
-        subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
-        subprocess.run(['systemctl', '--user', 'enable', 'mocha-nyxuri-shell.service'], check=True)
-        subprocess.run([sys.executable, str(args.adapter / 'tools/install-touch-navigation.py'),
-            '--adapter', str(args.adapter)], check=True)
+        if args.offline:
+            wants = units / 'graphical-session.target.wants'
+            wants.mkdir(exist_ok=True)
+            link = wants / 'mocha-nyxuri-shell.service'
+            if not link.is_symlink() and link.exists():
+                raise RuntimeError(f'Cannot replace existing non-symlink unit: {link}')
+            if link.is_symlink() and os.readlink(link) != '../mocha-nyxuri-shell.service':
+                raise RuntimeError(f'Existing unit points to another service: {link}')
+            if not link.is_symlink():
+                link.symlink_to('../mocha-nyxuri-shell.service')
+        else:
+            subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
+            subprocess.run(['systemctl', '--user', 'enable', 'mocha-nyxuri-shell.service'], check=True)
+        navigation = [sys.executable, str(args.adapter / 'tools/install-touch-navigation.py'),
+                      '--adapter', str(args.adapter)]
+        if args.offline:
+            navigation.append('--offline')
+        subprocess.run(navigation, check=True)
         print(f"NYXURI_FULL_DEPLOYED backup={backup}")
     return 0
 
