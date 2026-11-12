@@ -1,0 +1,188 @@
+--- a/libavutil/hwcontext_v4l2request.c
++++ b/libavutil/hwcontext_v4l2request.c
+@@ -16,13 +16,17 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  */
+ 
++#define _GNU_SOURCE
+ #include "config.h"
+ 
++#include <dirent.h>
+ #include <fcntl.h>
+ #include <linux/dma-buf.h>
+ #include <linux/media.h>
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
++#include <sys/stat.h>
++#include <sys/sysmacros.h>
+ #include <unistd.h>
+ 
+ #include <drm_fourcc.h>
+@@ -402,12 +406,13 @@
+ }
+ 
+ static int v4l2request_probe_video_device(AVHWFramesContext *hwfc,
+-                                          const char *path,
++                                          const char *path, dev_t devnum,
+                                           uint32_t pixelformat,
+                                           uint32_t buffersize)
+ {
+     AVV4L2RequestFramesContext *fctx = hwfc->hwctx;
+     AVV4L2RequestFramesContextInternal *fctxi = fctx->internal;
++    struct stat st;
+     struct v4l2_capability capability;
+     struct v4l2_create_buffers buffers;
+     unsigned int capabilities;
+@@ -417,12 +422,22 @@
+      * Open video device in non-blocking mode to support decoding using
+      * multiple queued requests, required for e.g. multi stage decoding.
+      */
+-    fctxi->video_fd = open(path, O_RDWR | O_NONBLOCK);
++    fctxi->video_fd = open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW);
+     if (fctxi->video_fd < 0) {
+         ret = AVERROR(errno);
+         av_log(hwfc, AV_LOG_ERROR, "Failed to open video device %s: %s (%d)\n",
+                path, strerror(errno), errno);
+         return ret;
++    }
++
++    // Validate the opened node, not only the name observed before open().
++    if (fstat(fctxi->video_fd, &st) < 0) {
++        ret = AVERROR(errno);
++        goto fail;
++    }
++    if (!S_ISCHR(st.st_mode) || st.st_rdev != devnum) {
++        ret = AVERROR(ENODEV);
++        goto fail;
+     }
+ 
+     // Query capabilities of the video device
+@@ -569,6 +584,42 @@
+     return ret;
+ }
+ 
++/* Only native numeric device names; no aliases or symlink traversal. */
++static int v4l2request_node_name(const char *name, const char *prefix)
++{
++    size_t len = strlen(prefix);
++    if (strncmp(name, prefix, len) || !name[len])
++        return 0;
++    for (name += len; *name; name++)
++        if (*name < '0' || *name > '9')
++            return 0;
++    return 1;
++}
++
++static int v4l2request_probe_video_devnum(AVHWFramesContext *hwfc, dev_t devnum,
++                                       uint32_t pixelformat, uint32_t buffersize)
++{
++    struct dirent *entry;
++    DIR *dir = opendir("/dev");
++    int ret = AVERROR(ENOENT);
++    if (!dir)
++        return AVERROR(errno);
++    while ((entry = readdir(dir))) {
++        char path[sizeof("/dev/") + sizeof(entry->d_name)];
++        struct stat st;
++        if (!v4l2request_node_name(entry->d_name, "video"))
++            continue;
++        snprintf(path, sizeof(path), "/dev/%s", entry->d_name);
++        if (lstat(path, &st) < 0 || !S_ISCHR(st.st_mode) || st.st_rdev != devnum)
++            continue;
++        ret = v4l2request_probe_video_device(hwfc, path, devnum, pixelformat, buffersize);
++        if (!ret)
++            break;
++    }
++    closedir(dir);
++    return ret;
++}
++
+ static int v4l2request_probe_video_devices(AVHWFramesContext *hwfc,
+                                            struct udev *udev,
+                                            uint32_t pixelformat,
+@@ -615,14 +666,17 @@
+             continue;
+ 
+         devnum = makedev(interfaces[i].devnode.major, interfaces[i].devnode.minor);
+-        device = udev_device_new_from_devnum(udev, 'c', devnum);
+-        if (!device)
+-            continue;
+-
+-        path = udev_device_get_devnode(device);
+-        if (path)
+-            ret = v4l2request_probe_video_device(hwfc, path, pixelformat, buffersize);
+-        udev_device_unref(device);
++        if (udev) {
++            device = udev_device_new_from_devnum(udev, 'c', devnum);
++            if (!device)
++                continue;
++            path = udev_device_get_devnode(device);
++            if (path)
++                ret = v4l2request_probe_video_device(hwfc, path, devnum, pixelformat, buffersize);
++            udev_device_unref(device);
++        } else {
++            ret = v4l2request_probe_video_devnum(hwfc, devnum, pixelformat, buffersize);
++        }
+ 
+         // Stop when we have found a capable video device
+         if (!ret) {
+@@ -720,6 +774,48 @@
+     return ret;
+ }
+ 
++/* Restricted processes may be unable to traverse libudev's sysfs paths.
++ * Fall back to absolute device nodes and the kernel's media topology. The
++ * caller's access policy still decides which nodes can actually be opened. */
++static int v4l2request_probe_media_nodes(AVHWFramesContext *hwfc,
++                                      uint32_t pixelformat, uint32_t buffersize)
++{
++    AVV4L2RequestFramesContext *fctx = hwfc->hwctx;
++    AVV4L2RequestFramesContextInternal *fctxi = fctx->internal;
++    struct dirent *entry;
++    DIR *dir = opendir("/dev");
++    int ret = AVERROR(ENOENT);
++    if (!dir)
++        return AVERROR(errno);
++    while ((entry = readdir(dir))) {
++        char path[sizeof("/dev/") + sizeof(entry->d_name)];
++        struct stat before, after;
++        if (!v4l2request_node_name(entry->d_name, "media"))
++            continue;
++        snprintf(path, sizeof(path), "/dev/%s", entry->d_name);
++        if (lstat(path, &before) < 0 || !S_ISCHR(before.st_mode))
++            continue;
++        fctxi->media_fd = open(path, O_RDWR | O_CLOEXEC | O_NOFOLLOW);
++        if (fctxi->media_fd < 0)
++            continue;
++        if (fstat(fctxi->media_fd, &after) < 0) {
++            ret = AVERROR(errno);
++        } else if (!S_ISCHR(after.st_mode) || before.st_rdev != after.st_rdev) {
++            ret = AVERROR(ENODEV);
++        } else {
++            ret = v4l2request_probe_video_devices(hwfc, NULL, pixelformat, buffersize);
++        }
++        if (!ret) {
++            av_log(hwfc, AV_LOG_INFO, "V4L2 Request absolute-node enumeration selected %s\n", path);
++            break;
++        }
++        close(fctxi->media_fd);
++        fctxi->media_fd = -1;
++    }
++    closedir(dir);
++    return ret;
++}
++
+ static int v4l2request_open_decoder(AVHWFramesContext *hwfc)
+ {
+     AVV4L2RequestFramesContext *fctx = hwfc->hwctx;
+@@ -743,6 +839,10 @@
+     ret = v4l2request_probe_media_devices(hwfc, udev, fctx->pixelformat, buffersize);
+ 
+     udev_unref(udev);
++    if (ret < 0) {
++        av_log(hwfc, AV_LOG_VERBOSE, "V4L2 Request udev discovery failed; trying absolute device nodes\n");
++        ret = v4l2request_probe_media_nodes(hwfc, fctx->pixelformat, buffersize);
++    }
+     return ret;
+ }
+ 
