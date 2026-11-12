@@ -130,10 +130,12 @@ device = Path('/sys/bus/platform/devices/60030000.video-codec/driver')
 active = device.is_symlink() and device.resolve().name in ('tegra-vde', 'mocha-vde-candidate')
 active = active and any(p.read_text().strip() == 'tegra-vde' and Path('/dev', p.parent.name).is_char_device()
                         for p in Path('/sys/class/video4linux').glob('video*/name'))
-if active:
-    os.environ['LD_LIBRARY_PATH'] = DECODER_LIB + ':' + os.environ.get('LD_LIBRARY_PATH', '')
-else:
-    # Stock libmpv does not know Request backend names. Keep default boot usable.
+# The isolated runtime contains both software codecs and the Request backend.
+# Keep its libmpv available even when VDE is absent; an image need not ship a
+# second, system libmpv merely to run the software fallback.
+os.environ['LD_LIBRARY_PATH'] = DECODER_LIB + ':' + os.environ.get('LD_LIBRARY_PATH', '')
+if not active:
+    # Do not request an unavailable hardware device on the fallback path.
     for i in range(1, len(args)):
         if args[i-1] in ('-o', '--mpv-options'):
             args[i] = re.sub(r'(?<!\\S)hwdec=v4l2request(?:-copy)?(?=\\s|$)', 'hwdec=auto', args[i])
