@@ -262,7 +262,10 @@ class Keyboard:
         else:
             argv=['wtype']
             if self.ctrl:argv+=['-M','ctrl']
-            argv += [label] if len(label)==1 else ['-k',label]
+            if label == '-':
+                argv += ['-k', 'minus']
+            else:
+                argv += [label] if len(label)==1 else ['-k',label]
             if self.ctrl:argv+=['-m','ctrl']
             subprocess.run(argv,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=2)
         self.ctrl=False
