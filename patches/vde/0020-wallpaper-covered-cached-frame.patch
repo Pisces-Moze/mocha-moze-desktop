@@ -1,0 +1,84 @@
+--- a/mpvpaper_service.luau
++++ b/mpvpaper_service.luau
+@@ -295,31 +295,37 @@
+   return CACHE_DIR .. "/" .. path:gsub("[^%w]", "_") .. ".jpg"
+ end
+ 
+-local function updateStaticWallpaper(connector, videoPath)
++local function updateStaticWallpaper(connector, videoPath, onReady)
+   local generation = generations[connector]
+   local outPath = cachePath(videoPath)
+-
++  local function complete(ready)
++    if not currentSelection(connector, videoPath, generation) then return end
++    if ready then
++      forEachOutput(connector, function(name)
++        noctalia.setWallpaper(name, outPath)
++      end)
++    end
++    if onReady then onReady(ready) end
++  end
+   if noctalia.fileExists(outPath) then
+-    forEachOutput(connector, function(name)
+-      noctalia.setWallpaper(name, outPath)
+-    end)
++    complete(true)
+     return
+   end
+-
+-  if not cfg("extract_last_frame") then return end
+-
++  if not cfg("extract_last_frame") then
++    complete(false)
++    return
++  end
+   noctalia.runAsync("mkdir -p " .. shellQuote(CACHE_DIR), function()
+     if not currentSelection(connector, videoPath, generation) then return end
+-    local cmd = "ffmpeg -y -ss 1 -i " .. shellQuote(videoPath) .. " -frames:v 1 -q:v 2 " .. shellQuote(outPath)
++    local cmd = "ffmpeg -y -threads 1 -ss 1 -i " .. shellQuote(videoPath) ..
++      " -frames:v 1 -threads 1 -q:v 2 " .. shellQuote(outPath)
+     noctalia.runAsync(cmd, function(result)
+-      if not currentSelection(connector, videoPath, generation) then return end
+-      if type(result) == "table" and result.exitCode == 0 and noctalia.fileExists(outPath) then
+-        forEachOutput(connector, function(name)
+-          noctalia.setWallpaper(name, outPath)
+-        end)
+-      else
+-        noctalia.log("mpvpaper: static-frame extraction failed for " .. videoPath .. ": " .. tostring(result and result.stderr))
+-      end
++      local ready = type(result) == "table" and result.exitCode == 0 and noctalia.fileExists(outPath)
++      if not ready then
++        noctalia.log("mpvpaper: static-frame extraction failed for " .. videoPath .. ": " ..
++          tostring(result and result.stderr))
++      end
++      complete(ready)
+     end)
+   end)
+ end
+@@ -703,15 +709,18 @@
+       local value = tonumber(result.stdout:match('"data"%s*:%s*([%d%.]+)'))
+       if value and value >= 0 and value < 2678400 then released.position = value end
+     end
+-    killMpvpaper(connector, function(result)
++    updateStaticWallpaper(connector, path, function()
+       if not currentSelection(connector, path, generation) then return end
+-      if type(result) ~= "table" or result.exitCode ~= 0 then
+-        pressureReleased[connector] = nil
+-        noctalia.log("mpvpaper: pressure release did not finish; will retry")
+-        return
+-      end
+-      forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
+-      publish()
++      killMpvpaper(connector, function(result)
++        if not currentSelection(connector, path, generation) then return end
++        if type(result) ~= "table" or result.exitCode ~= 0 then
++          pressureReleased[connector] = nil
++          noctalia.log("mpvpaper: pressure release did not finish; will retry")
++          return
++        end
++        forEachOutput(connector, function(name) noctalia.setWallpaperEnabled(name, true) end)
++        publish()
++      end)
+     end)
+   end
+   if noctalia.fileExists(ipcSocketPath(connector)) and noctalia.commandExists("socat") then

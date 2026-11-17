@@ -55,7 +55,7 @@ class Keyboard:
         GtkLayerShell.set_layer(self.candidate_window,GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_mode(self.candidate_window,GtkLayerShell.KeyboardMode.NONE)
         GtkLayerShell.set_anchor(self.candidate_window,GtkLayerShell.Edge.BOTTOM,True)
-        GtkLayerShell.set_margin(self.candidate_window,GtkLayerShell.Edge.BOTTOM,280)
+        GtkLayerShell.set_margin(self.candidate_window,GtkLayerShell.Edge.BOTTOM,8)
         scroller=Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.AUTOMATIC,Gtk.PolicyType.NEVER)
         scroller.set_kinetic_scrolling(True)
@@ -246,7 +246,9 @@ class Keyboard:
     def symbol_key(self): self.symbols=not self.symbols;self.build_keys()
     def ctrl_key(self): self.ctrl=not self.ctrl;self.preedit.set_text('Ctrl' if self.ctrl else '拼音')
     def toggle_im(self):
-        try:self.call(FCITX,'/controller','org.fcitx.Fcitx.Controller1','Toggle')
+        try:
+            self.call(FCITX,'/controller','org.fcitx.Fcitx.Controller1','Toggle')
+            self.show_fcitx()
         except GLib.Error:self.preedit.set_text('请先点选应用输入框')
 
     def key(self,label):

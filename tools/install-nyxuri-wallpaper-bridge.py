@@ -21,6 +21,7 @@ PATCH_NAMES = [
     '0015-wallpaper-pressure-reconfigure.patch',
     '0017-noctalia-wallpaper-occlusion.patch',
     '0019-noctalia-workarea-coverage.patch',
+    '0020-wallpaper-covered-cached-frame.patch',
 ]
 
 

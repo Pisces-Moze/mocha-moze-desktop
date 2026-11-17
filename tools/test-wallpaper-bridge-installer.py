@@ -25,7 +25,8 @@ def main():
              '0013-wallpaper-resource-pressure.patch',
              '0015-wallpaper-pressure-reconfigure.patch',
              '0017-noctalia-wallpaper-occlusion.patch',
-             '0019-noctalia-workarea-coverage.patch']
+             '0019-noctalia-workarea-coverage.patch',
+             '0020-wallpaper-covered-cached-frame.patch']
     files = ['mpvpaper_service.luau', 'plugin.toml', 'translations/en.json',
              'translations/zh-Hans.json', 'config/noctalia/tools/wallpaper_picker/backend.py']
     with tempfile.TemporaryDirectory(prefix='wallpaper-installer-test-') as directory:
@@ -75,7 +76,7 @@ def main():
         result = subprocess.run(command, capture_output=True)
         assert result.returncode != 0 and not (base/'conflict-backup').exists()
         assert before == {name: (conflict/name).read_bytes() for name in files}
-    print('EIGHT_PATCH_PREFIXES_IDEMPOTENT_CHECK_BACKUP_AND_CONFLICT_REFUSAL_PASSED')
+    print('WALLPAPER_PATCH_PREFIXES_IDEMPOTENT_CHECK_BACKUP_AND_CONFLICT_REFUSAL_PASSED')
 
 
 if __name__ == '__main__':
