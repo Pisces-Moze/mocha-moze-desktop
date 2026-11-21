@@ -27,7 +27,7 @@ prefix = args.destination / 'runtime'
 build.mkdir()
 env = dict(os.environ, PKG_CONFIG_LIBDIR='/usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig')
 records = {}
-for name in ['0001-ffmpeg-7.1-request-api-upstream.patch', '0002-ffmpeg-request-three-plane-yuv420.patch', '0005-ffmpeg-request-multiplanar-queue.patch', '0006-ffmpeg-linear-planar-download.patch']:
+for name in ['0001-ffmpeg-7.1-request-api-upstream.patch', '0002-ffmpeg-request-three-plane-yuv420.patch', '0005-ffmpeg-request-multiplanar-queue.patch', '0006-ffmpeg-linear-planar-download.patch', '0007-ffmpeg-request-device-node-fallback.patch']:
     patch = (args.patches / name).resolve()
     records[name] = hashlib.file_digest(patch.open('rb'), 'sha256').hexdigest()
     for check in [True, False]:

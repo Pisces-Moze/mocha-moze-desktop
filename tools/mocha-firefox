@@ -1,0 +1,18 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+# Pick the matched Tegra Mesa first, then prepend Firefox's bundled NSS.
+set -eu
+runtime=$(readlink -f /usr/lib/firefox-esr)
+test -x "$runtime/firefox-esr"
+test -f "$runtime/libnss3.so"
+exec /usr/local/libexec/mocha-native-app /bin/sh -c '
+    runtime=$1
+    shift
+    if test -f "$runtime/mocha-request-runtime.json" && test -f "$runtime/codecs/libavcodec.so.61"; then
+        export LD_LIBRARY_PATH="$runtime:$runtime/codecs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    else
+        export LD_LIBRARY_PATH="$runtime${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    fi
+    export MOZ_ENABLE_WAYLAND=1
+    exec "$runtime/firefox-esr" "$@"
+' mocha-firefox "$runtime" "$@"

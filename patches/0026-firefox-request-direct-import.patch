@@ -1,0 +1,104 @@
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.cpp
+@@ -3,6 +3,8 @@
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+ #include "FFmpegVideoFramePool.h"
++
++#include <cstring>
+ 
+ #include "FFmpegLog.h"
+ #include "PlatformDecoderModule.h"
+@@ -651,12 +653,55 @@
+   }
+ 
+   bool copySurface = mTextureCopyWorks && ShouldCopySurface();
++  bool requestDirectImport = false;
++#ifdef MOZ_ENABLE_V4L2
++  // The generic platform capability test currently probes VA-API/stateful
++  // V4L2, so it can disable zero-copy even after stateless Request succeeds.
++  // Honor the existing explicit zero-copy opt-in only for validated linear
++  // Request I420 frames. Keep normal buffer references and pressure fallback.
++  if (copySurface && mRequestDirectImportWorks &&
++      StaticPrefs::media_ffmpeg_vaapi_force_surface_zero_copy_AtStartup() == 1 &&
++      aLib->av_hwdevice_get_type_name && aAVFrame->hw_frames_ctx &&
++      aAVFrame->buf[0] && aDesc.nb_layers == 1 &&
++      aDesc.layers[0].format == DRM_FORMAT_YUV420 &&
++      aDesc.layers[0].nb_planes == 3) {
++    auto* frames = reinterpret_cast<AVHWFramesContext*>(
++        aAVFrame->hw_frames_ctx->data);
++    auto* device = frames->device_ref
++                       ? reinterpret_cast<AVHWDeviceContext*>(frames->device_ref->data)
++                       : nullptr;
++    const char* type = device ? aLib->av_hwdevice_get_type_name(device->type) : nullptr;
++    bool linear = type && !std::strcmp(type, "v4l2request");
++    for (int i = 0; i < aDesc.nb_objects; ++i) {
++      linear &= aDesc.objects[i].format_modifier == DRM_FORMAT_MOD_LINEAR;
++    }
++    size_t inUse = 0;
++    for (const auto& item : mDMABufSurfaces) {
++      inUse += item->mHoldByFFmpeg || item->IsUsedByRenderer();
++    }
++    const size_t limit = mMaxFFMPEGPoolSize * 3 / 4;
++    if (linear && inUse < limit) {
++      copySurface = false;
++      requestDirectImport = true;
++      DMABUF_LOG("Request direct import: renderer holds {} surfaces", inUse);
++    }
++  }
++#endif
+   if (!surface->UpdateYUVData(layerDesc.value(), crop_width, crop_height,
+                               copySurface)) {
+-    if (!copySurface) {
+-      // Failed without texture copy. We can't do more here.
+-      return nullptr;
+-    }
++    if (!copySurface && requestDirectImport && mTextureCopyWorks) {
++      DMABUF_LOG("Request direct import failed; trying texture copy");
++      mRequestDirectImportWorks = false;
++      copySurface = true;
++      requestDirectImport = false;
++      if (!surface->UpdateYUVData(layerDesc.value(), crop_width, crop_height,
++                                  true)) {
++        return nullptr;
++      }
++    } else {
++      if (!copySurface) {
++        return nullptr;
++      }
+     // Try again without texture copy
+     DMABUF_LOG("  DMABuf texture copy is broken");
+     copySurface = mTextureCopyWorks = false;
+@@ -664,13 +709,20 @@
+                                 copySurface)) {
+       return nullptr;
+     }
++    }
+   }
+ 
+   if (MOZ_UNLIKELY(!mTextureCreationWorks)) {
+     mTextureCreationWorks = Some(surface->VerifyTextureCreation());
+     if (!*mTextureCreationWorks) {
+-      DMABUF_LOG("  failed to create texture over DMABuf memory!");
+-      return nullptr;
++      if (!requestDirectImport || !mTextureCopyWorks ||
++          !surface->UpdateYUVData(layerDesc.value(), crop_width, crop_height,
++                                  true) || !surface->VerifyTextureCreation()) {
++        return nullptr;
++      }
++      copySurface = true;
++      mRequestDirectImportWorks = false;
++      mTextureCreationWorks = Some(true);
+     }
+   }
+ 
+--- a/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.h
++++ b/dom/media/platforms/ffmpeg/FFmpegVideoFramePool.h
+@@ -172,6 +172,7 @@
+   Maybe<bool> mTextureCreationWorks;
+   // We may fail to copy DMABuf memory on NVIDIA drivers.
+   bool mTextureCopyWorks = true;
++  bool mRequestDirectImportWorks = true;
+ };
+ 
+ }  // namespace mozilla

@@ -1,0 +1,43 @@
+--- a/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
++++ b/security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp
+@@ -866,6 +866,10 @@ static void AddV4l2RequestDependencies(SandboxBroker::Policy* policy) {
+   if (!Preferences::GetBool("media.ffmpeg.v4l2-request.enabled", false)) {
+     return;
+   }
++  // Media enumeration opens the root directory to begin path traversal.
++  // Authorize this directory only; AddTree("/") would expose unrelated files.
++  // Device read/write remains restricted to the verified VDE nodes below.
++  policy->AddPath(rdonly, "/");
+   DIR* dir = opendir("/dev");
+   if (!dir) {
+     return;
+@@ -1088,3 +1092,10 @@
+ #ifdef MOZ_ENABLE_V4L2
+   AddV4l2Dependencies(policy.get());
++  if (Preferences::GetBool("media.ffmpeg.v4l2-request.enabled", false)) {
++    // udev reads mount IDs for its own directory handles. Expose only this
++    // RDD process's fd metadata, never another process or the /proc tree.
++    nsPrintfCString fdinfo("/proc/%d/fdinfo", aPid);
++    policy->AddTree(rdonly, fdinfo.get());
++    policy->AddAncestors(fdinfo.get(), access);
++  }
+ #endif  // MOZ_ENABLE_V4L2
+--- a/security/sandbox/linux/broker/SandboxBroker.cpp
++++ b/security/sandbox/linux/broker/SandboxBroker.cpp
+@@ -498,4 +498,16 @@
+ static bool AllowOpen(int aReqFlags, int aPerms) {
++#ifdef MOZ_ENABLE_V4L2
++  if (aReqFlags & O_PATH) {
++    // udev path traversal needs directory handles, never writable handles.
++    // Retain the existing read-permission check for the exact policy path.
++    const int pathFlags =
++        O_PATH | O_DIRECTORY | O_CLOEXEC | O_LARGEFILE | O_NOFOLLOW;
++    if (!(aReqFlags & O_DIRECTORY) || (aReqFlags & ~pathFlags)) {
++      return false;
++    }
++    aReqFlags &= ~O_PATH;
++  }
++#endif
+   if (aReqFlags & ~O_ACCMODE & ~kAllowedOpenFlags) {
+     return false;
+   }

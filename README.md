@@ -4,7 +4,7 @@
 
 本次汇总已经过实机阶段验证的桌面、壁纸生命周期、触屏输入、蓝牙面板、Mesa 和开机动画修改；各项证据及其限制保留在 `validation/`。[Pinyin 候选背景修复](tools/fix-fcitx-candidate-theme.py) 与候选条滚动复位已于 10 月 28 日装入实机并重载，实际候选视觉验收仍待确认。桌面后的动画临时缓冲和用户态动画进程均为零，见 [检查记录](validation/input-animation-2026-10-28.json)。
 
-Firefox Request 解码补丁已修正旧 FFmpeg ABI 的编译条件，并按 Debian 支持的无 Rust LTO 配置完成完整构建（2026-10-30 核对 exit 0）；[构建及支持范围](tools/firefox-request/README.md)。尚未把浏览器端视频硬解列为实机通过。系统镜像与首次设置由 [Debian 总入口](https://github.com/Pisces-Moze/mocha-moze-debian/blob/main/docs/DISTRIBUTION.md) 管理。
+Firefox Request 解码补丁已修正旧 FFmpeg ABI 的编译条件，并按 Debian 支持的无 Rust LTO 配置完成完整构建（2026-10-30 核对 exit 0）；[构建及支持范围](tools/firefox-request/README.md)。2026-11-01 已把 153.5.1esr Request 候选安装为原型默认浏览器并在 RDD 沙箱保留的情况下输出 VDE 硬件帧，但真实网站与播放性能验收尚未通过，不能把“硬解出图”当作网站硬解验收。系统镜像与首次设置由 [Debian 总入口](https://github.com/Pisces-Moze/mocha-moze-debian/blob/main/docs/DISTRIBUTION.md) 管理。
 
 > 为跑 Debian armhf 的小米平板 1 提供横屏 Niri 桌面，以及与桌面方向一致的最小充电界面。
 
@@ -18,7 +18,7 @@ Mocha 是小米平板 1（A0101，NVIDIA Tegra124）的项目代号。本仓库�
 
 ## 视频与内存进展（2026-10-23）
 
-Firefox 已安装可调整的 AVC 优先、缓存和进程默认值；同一 B 站视频恢复播放后，解码线程从 AV1 切换为 H.264。网页／渲染仍有明显 CPU 开销，Firefox 硬解尚未接通。配置、生效证据、限制与回退见 [浏览器性能记录](docs/BROWSER-PERFORMANCE.md)。独立播放器已使用 VDE Request 硬解；内置双扬声器也已由用户确认发声，持久安装详情见驱动仓库音频文档。下表和后续章节保留历史路径信息，以最新验证记录为准。
+Firefox 已安装可调整的 AVC 优先、缓存和进程默认值；同一 B 站视频恢复播放后，解码线程从 AV1 切换为 H.264。网页／渲染仍有明显 CPU 开销。2026-11-01 起 153.5.1esr Request 候选已装为原型默认，RDD 沙箱保留且 VDE 硬解可出帧，但真实网站播放性能和丢帧仍未验收通过；详见 [Firefox 运行库记录](docs/FIREFOX-RUNTIME.md)。配置、生效证据、限制与回退见 [浏览器性能记录](docs/BROWSER-PERFORMANCE.md)。独立播放器已使用 VDE Request 硬解；内置双扬声器也已由用户确认发声，持久安装详情见驱动仓库音频文档。下表和后续章节保留历史路径信息，以最新验证记录为准。
 
 ## 原生桌面进展（2026-10-13）
 
